@@ -1,4 +1,5 @@
 /cache*
-/rootfs
+/pacman_cache
 /deployment
 /test/cache*
+arch-ostree.config

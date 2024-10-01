@@ -14,21 +14,28 @@ builder_tag="archlinux-ostree-builder"
 rootfs_tag="archlinux-ostree-rootfs"
 ostree_repo="/sysroot/ostree/repo"
 podman_build_cache=false
+deploy_env_dir="$scriptdir/deployment"
+pacman_cache=
+rootfs_containerfile="$scriptdir/Containerfile.full"
+sysroot_dir="/mnt"
+
+# shellcheck source=arch-ostree.config.example
+[[ -f "$scriptdir/arch-ostree.config" ]] && source "$scriptdir/arch-ostree.config"
 
 usage() {
 	cat <<EOF
 USAGE: ${0##*/} [options] [command] [arg...]
 
 <bool> is a value of 0, false, no, 1, true or yes.
+all value options may be defined in $scriptdir/arch-ostree.config
 
 COMMON OPTIONS:
-    --aur-dir
-        Path to the directory where built AUR packages are stored.
     --builder-tag <name>
         Name of the tag to use for the pacstrap container.
         Default: archlinux-ostree-builder
     --deploy-env-dir <path>
         Path to the directory that's used as the deployment environment.
+        Default: $scriptdir/deployment
     --ostree-repo <path>
         Path to the ostree repository.
         Default: /sysroot/ostree/repo
@@ -42,12 +49,14 @@ COMMON OPTIONS:
     --sysroot-dir
         Path to the directory where your rootfs and all your partitions
         (like boot or efi) are mounted.
+        Default: /mnt
     --help
         Print this help message
 
 CONTAINER OPTIONS:
     --rootfs-containerfile <path>
         Path to the Containerfile used for building the rootfs container.
+        Default: $scriptdir/examples/Containerfile.full
     --rootfs-tag <name>
         Name of the tag to use for the rootfs container.
         Default: archlinux-ostree-rootfs
@@ -158,7 +167,6 @@ deploy_env() {
 }
 
 long_opts=(
-	aur-dir:
 	builder-tag:
 	deploy-env-dir:
 	help
@@ -166,7 +174,6 @@ long_opts=(
 	pacman-cache:
 	podman-build-cache:
 	rootfs-containerfile:
-	rootfs-dir:
 	rootfs-tag:
 	sysroot-dir:
 )
@@ -184,12 +191,10 @@ while true; do
 		shift 2
 		continue
 		;;
-	'--aur-dir' | \
-		'--deploy-env-dir' | \
+	'--deploy-env-dir' | \
 		'--ostree-repo' | \
 		'--pacman-cache' | \
 		'--rootfs-containerfile' | \
-		'--rootfs-dir' | \
 		'--sysroot-dir')
 		name="$(arg_to_varname "$1")"
 		value="$(realpath "$2")"
