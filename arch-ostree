@@ -76,13 +76,16 @@ COMMON COMMANDS:
         environment.
 
 CONTAINER COMMANDS:
+    build	
     build_rootfs_container
         Build rootfs container from --rootfs-containerfile and tag it with
         --rootfs-tag.
+    commit -- [arg...]
     commit_rootfs_container -- [arg...]
         Commit --rootfs-tag container to --ostree-repo. This tool provides
         --repo and --tree-dir to "ostree commit". Everything else
         (like branch name) can and has to be provided by you.
+    enter -- [arg...]
     enter_rootfs_container -- [arg...]
         Enter --rootfs-tag container. All changes will be lost.
 EOF
@@ -299,14 +302,13 @@ case "$command" in
 'build_builder_container')
 	build_builder_container
 	;;
-
-'build_rootfs_container')
+'build' | 'build_rootfs_container')
 	build_rootfs_container
 	;;
-'enter_rootfs_container')
+'enter' | 'enter_rootfs_container')
 	enter_rootfs_container "$@"
 	;;
-'commit_rootfs_container')
+'commit' | 'commit_rootfs_container')
 	commit_rootfs_container "$@"
 	;;
 'deploy_env')
