@@ -234,7 +234,7 @@ eval set -- "$temp"
 while true; do
 	case "$1" in
 	'--builder-tag' | \
-		'--rootfs-tag')
+		'--rootfs-tag' | \
 		'--rootfs-target')
 		name="$(arg_to_varname "$1")"
 		printf -v "$name" "%s" "$2"
@@ -311,11 +311,11 @@ if [[ -d ${rootfs_setup_dir} ]]; then
 	if [[ -z "$containerfiles" ]]; then
 		die "No Containerfiles found in setup directory"
 	fi
-  for item in "${containerfiles[@]}"; do
-    podman_build_file_args+=(-f "$item")
-  done
+	for item in "${containerfiles[@]}"; do
+		podman_build_file_args+=(-f "$item")
+	done
 else
-	die  "Setup directory does not exist"
+	die "Setup directory does not exist"
 fi
 
 case "$command" in
