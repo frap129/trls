@@ -166,6 +166,43 @@ deploy_env() {
 	chroot "$deploy_env_dir" "${args[@]}"
 }
 
+build_builder_container() {
+	podman build \
+		"${podman_build_cache_args[@]}" \
+		-f "$share_dir/Containerfile.builder" \
+		-t "$builder_tag"
+}
+
+build_rootfs_container() {
+	podman build \
+		"${podman_build_cache_args[@]}" \
+		"${pacman_cache_args[@]}" \
+		--cap-add sys_admin \
+		--cap-add mknod \
+		-f "$rootfs_containerfile" \
+		-t "$rootfs_tag"
+}
+
+enter_rootfs_container() {
+	podman run \
+		--rm -it \
+		"localhost/$rootfs_tag" \
+		"$@"
+}
+
+commit_rootfs_container() {
+	podman run \
+		--cap-add sys_admin \
+		--security-opt apparmor=unconfined \
+		--mount "type=image,src=localhost/$rootfs_tag,dst=/mnt-lower" \
+		--mount "type=bind,src=$ostree_repo,dst=/sysroot/ostree/repo" \
+		-v "$lib_dir:/opt/lib:ro" \
+		-v "$share_dir:/opt/share:ro" \
+		--rm -it \
+		"localhost/$builder_tag" \
+		/opt/lib/commit_rootfs "$@"
+}
+
 long_opts=(
 	builder-tag:
 	deploy-env-dir:
@@ -260,38 +297,17 @@ case "$command" in
 	prepare_live_env
 	;;
 'build_builder_container')
-	podman build \
-		"${podman_build_cache_args[@]}" \
-		-f "$share_dir/Containerfile.builder" \
-		-t "$builder_tag"
+	build_builder_container
 	;;
 
 'build_rootfs_container')
-	podman build \
-		"${podman_build_cache_args[@]}" \
-		"${pacman_cache_args[@]}" \
-		--cap-add sys_admin \
-		--cap-add mknod \
-		-f "$rootfs_containerfile" \
-		-t "$rootfs_tag"
+	build_rootfs_container
 	;;
 'enter_rootfs_container')
-	podman run \
-		--rm -it \
-		"localhost/$rootfs_tag" \
-		"$@"
+	enter_rootfs_container "$@"
 	;;
 'commit_rootfs_container')
-	podman run \
-		--cap-add sys_admin \
-		--security-opt apparmor=unconfined \
-		--mount "type=image,src=localhost/$rootfs_tag,dst=/mnt-lower" \
-		--mount "type=bind,src=$ostree_repo,dst=/sysroot/ostree/repo" \
-		-v "$lib_dir:/opt/lib:ro" \
-		-v "$share_dir:/opt/share:ro" \
-		--rm -it \
-		"localhost/$builder_tag" \
-		/opt/lib/commit_rootfs "$@"
+	commit_rootfs_container "$@"
 	;;
 'deploy_env')
 	args=("$@")
