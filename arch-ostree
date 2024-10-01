@@ -306,13 +306,13 @@ if [ "$podman_build_cache" = false ]; then
 fi
 
 podman_build_file_args=()
-if [[ -f ${rootfs_setup_dir} ]]; then
+if [[ -d ${rootfs_setup_dir} ]]; then
 	containerfiles=$(find ${rootfs_setup_dir} -name "Containerfile*")
 	if [[ -z "$containerfiles" ]]; then
 		die "No Containerfiles found in setup directory"
 	fi
   for item in "${containerfiles[@]}"; do
-    podman_build_file_args+=("-f $item")
+    podman_build_file_args+=(-f "$item")
   done
 else
 	die  "Setup directory does not exist"
