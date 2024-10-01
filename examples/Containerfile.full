@@ -30,7 +30,7 @@ RUN mkdir /aur
 RUN cp /home/builder/yay-bin/*.tar.zst /aur/
 
 # Turn the pacstrapped rootfs into a container image.
-FROM scratch
+FROM scratch as archlinux-ostree-rootfs
 COPY --from=builder /mnt /
 
 # The rootfs can't be modified and systemd can't create them implicitly.
