@@ -5,10 +5,11 @@
 # 'scriptdir' refers to the path of the arch-ostree checkout
 
 builder_tag="archlinux-ostree-builder"
-rootfs_tag="archlinux-ostree-rootfs"
 ostree_repo="/sysroot/ostree/repo"
+sysroot_dir="/mnt"
 podman_build_cache=false
 deploy_env_dir="$scriptdir/deployment"
 pacman_cache=
-rootfs_containerfile="$scriptdir/Containerfile.full"
-sysroot_dir="/mnt"
+rootfs_setup_dir="$scriptdir/setup"
+rootfs_target="archlinux-ostree-rootfs"
+rootfs_tag="archlinux-ostree-rootfs"

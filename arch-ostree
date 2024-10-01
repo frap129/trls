@@ -11,13 +11,14 @@ share_dir="$scriptdir/share"
 source "$lib_dir/common.sh"
 
 builder_tag="archlinux-ostree-builder"
-rootfs_tag="archlinux-ostree-rootfs"
 ostree_repo="/sysroot/ostree/repo"
+sysroot_dir="/mnt"
 podman_build_cache=false
 deploy_env_dir="$scriptdir/deployment"
 pacman_cache=
-rootfs_containerfile="$scriptdir/Containerfile.full"
-sysroot_dir="/mnt"
+rootfs_setup_dir="$scriptdir/setup"
+rootfs_target="archlinux-ostree-rootfs"
+rootfs_tag="archlinux-ostree-rootfs"
 
 # shellcheck source=arch-ostree.config.example
 [[ -f "$scriptdir/arch-ostree.config" ]] && source "$scriptdir/arch-ostree.config"
@@ -54,9 +55,15 @@ COMMON OPTIONS:
         Print this help message
 
 CONTAINER OPTIONS:
-    --rootfs-containerfile <path>
-        Path to the Containerfile used for building the rootfs container.
-        Default: $scriptdir/examples/Containerfile.full
+    --rootfs-setup-dir <path>
+        Path to the directory with Containerfiles and setup files that build
+        the rootfs.
+        Default: $scriptdir/setup
+    --rootfs-target <path>
+        Name of the image target containing the rootfs, defined in a
+        Containerfile in the rootfs setup directory using
+        'FROM <base> AS <target>'
+        Default: archlinux-ostree-rootfs
     --rootfs-tag <name>
         Name of the tag to use for the rootfs container.
         Default: archlinux-ostree-rootfs
@@ -78,7 +85,7 @@ COMMON COMMANDS:
 CONTAINER COMMANDS:
     build	
     build_rootfs_container
-        Build rootfs container from --rootfs-containerfile and tag it with
+        Build --rootfs-target from files in --rootfs-setup-dir and tag it with
         --rootfs-tag.
     commit -- [arg...]
     commit_rootfs_container -- [arg...]
@@ -180,9 +187,10 @@ build_rootfs_container() {
 	podman build \
 		"${podman_build_cache_args[@]}" \
 		"${pacman_cache_args[@]}" \
+		"${podman_build_file_args[@]}" \
 		--cap-add sys_admin \
 		--cap-add mknod \
-		-f "$rootfs_containerfile" \
+		-t "$rootfs_target" \
 		-t "$rootfs_tag"
 }
 
@@ -213,7 +221,8 @@ long_opts=(
 	ostree-repo:
 	pacman-cache:
 	podman-build-cache:
-	rootfs-containerfile:
+	rootfs-setup-dir:
+	rootfs-target:
 	rootfs-tag:
 	sysroot-dir:
 )
@@ -226,6 +235,7 @@ while true; do
 	case "$1" in
 	'--builder-tag' | \
 		'--rootfs-tag')
+		'--rootfs-target')
 		name="$(arg_to_varname "$1")"
 		printf -v "$name" "%s" "$2"
 		shift 2
@@ -234,7 +244,7 @@ while true; do
 	'--deploy-env-dir' | \
 		'--ostree-repo' | \
 		'--pacman-cache' | \
-		'--rootfs-containerfile' | \
+		'--rootfs-setup-dir' | \
 		'--sysroot-dir')
 		name="$(arg_to_varname "$1")"
 		value="$(realpath "$2")"
@@ -293,6 +303,19 @@ podman_build_cache_args=()
 if [ "$podman_build_cache" = false ]; then
 	podman_build_cache_args+=(--no-cache)
 	export BUILDAH_LAYERS=false
+fi
+
+podman_build_file_args=()
+if [[ -f ${rootfs_setup_dir} ]]; then
+	containerfiles=$(find ${rootfs_setup_dir} -name "Containerfile*")
+	if [[ -z "$containerfiles" ]]; then
+		die "No Containerfiles found in setup directory"
+	fi
+  for item in "${containerfiles[@]}"; do
+    podman_build_file_args+=("-f $item")
+  done
+else
+	die  "Setup directory does not exist"
 fi
 
 case "$command" in

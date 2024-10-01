@@ -3,3 +3,4 @@
 /deployment
 /test/cache*
 arch-ostree.config
+/setup
