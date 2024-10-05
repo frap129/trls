@@ -7,9 +7,10 @@
 builder_tag="archlinux-ostree-builder"
 ostree_repo="/sysroot/ostree/repo"
 sysroot_dir="/mnt"
-podman_build_cache=false
 deploy_env_dir="$scriptdir/deployment"
-#pacman_cache=
-rootfs_setup_dir="$scriptdir/setup"
-rootfs_target="archlinux-ostree-rootfs"
+src_dir="$scriptdir/setup"
+podman_build_cache=false
+pacman_cache=false
+build_stages=()
+extra_contexts=()
 rootfs_tag="archlinux-ostree-rootfs"
