@@ -198,7 +198,7 @@ build_rootfs_container() {
 	last_stage=""
 	for build_stage in "${build_stages[@]}"; do
 		# Parse build group and build stage
-		if [[ "$build_stage" == "*:*" ]]; then
+		if [[ "$build_stage" == *":"* ]]; then
 			group=$(cut -d: -f1 <<< "$build_stage")
 			stage=$(cut -d: -f2 <<< "$build_stage")
 		else
