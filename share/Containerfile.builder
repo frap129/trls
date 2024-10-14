@@ -37,3 +37,13 @@ RUN ln -s sysroot/ostree /ostree
 # This allows using pacstrap -N in a rootless container.
 RUN echo 'root:1000:5000' > /etc/subuid
 RUN echo 'root:1000:5000' > /etc/subgid
+
+# Setup for building AUR packages
+RUN pacman --noconfirm -Syu base-devel git sudo
+RUN useradd -m builder
+RUN echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/builder
+USER builder
+RUN mkdir /home/builder/aur/
+USER root
+RUN mkdir /aur
+COPY build-aur.sh /usr/bin/build-aur
