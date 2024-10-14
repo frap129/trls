@@ -41,11 +41,11 @@ COMMON OPTIONS:
         Path to the ostree repository.
         Default: /sysroot/ostree/repo
     --podman-build-cache <bool>
-        Enable/Disable podman build cache. Boolean.
+        Enable/Disable podman build cache. Boolean. This controls both podmans
+        --no-cache option and buildahs BUILDAH_LAYERS environment variable.
         Default: no.
     --pacman-cache <path>
-        Path to a persistent pacman package cache. This controls both podmans
-        --no-cache option and buildahs BUILDAH_LAYERS environment variable.
+        Path to a persistent pacman package cache.
         Default: undefined, thus the pacman cache is disabled.
     --sysroot-dir
         Path to the directory where your rootfs and all your partitions
