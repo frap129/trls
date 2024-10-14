@@ -47,6 +47,9 @@ COMMON OPTIONS:
     --pacman-cache <path>
         Path to a persistent pacman package cache.
         Default: undefined, thus the pacman cache is disabled.
+    --aur-cache <path>
+        Path to use as a persistent AUR package build cache.
+        Default: undefined, thus the aur cache is disabled.
     --sysroot-dir
         Path to the directory where your rootfs and all your partitions
         (like boot or efi) are mounted.
@@ -218,6 +221,7 @@ build_rootfs_container() {
 			${podman_build_cache_args[@]} \
 			${podman_build_context_args[@]} \
 			${pacman_cache_args[@]} \
+			${aur_cache_args[@]} \
 			--cap-add sys_admin \
 			--cap-add mknod \
 			-f "$(find $src_dir -name "Containerfile.$group")" \
@@ -254,6 +258,7 @@ long_opts=(
 	help
 	ostree-repo:
 	pacman-cache:
+	aur-cache:
 	podman-build-cache:
 	src-dir:
 	build-stages:
@@ -278,6 +283,7 @@ while true; do
 	'--deploy-env-dir' | \
 		'--ostree-repo' | \
 		'--pacman-cache' | \
+		'--aur-cache' | \
 		'--src-dir' | \
 		'--sysroot-dir')
 		name="$(arg_to_varname "$1")"
@@ -337,6 +343,15 @@ if [ ! -z ${pacman_cache+x} ]; then
 	mkdir -p "$pacman_cache"
 	pacman_cache_args=(
 		-v "$pacman_cache:/var/cache/pacman/pkg"
+	)
+fi
+
+aur_cache_args=()
+# shellcheck disable=SC2236 # This doesn't work with -n
+if [ ! -z ${aur_cache+x} ]; then
+	mkdir -p "$aur_cache"
+	aur_cache_args=(
+		-v "$aur_cache:/home/builder/aur"
 	)
 fi
 
