@@ -16,15 +16,20 @@ for pkg in "$@"; do
     fi
 
     # Check if package exists in cache before building
-    pkgver="$(grep "pkgver=" PKGBUILD | rev | cut -d'=' -f1 | rev)"
-    if find . -name "${pkg}-${pkgver}*.pkg.tar*" -print -quit | grep -q .; then
-        echo "$pkg already built"
-    else
-        # Build package
-        su builder -c "makepkg -fcCs --noconfirm --skippgpcheck"
-    fi
+    need_build=false
+    for filename in "$(su builder -c 'makepkg --packagelist')"; do
+        if [[ -f "$filename" ]]; then
+            echo "$filename already built"
+        else
+            need_build=true
+            break
+        fi
+    done
+
+    # Build package
+    ($need_build) && su builder -c "makepkg -fcCs --noconfirm --skippgpcheck"
 
     # Copy to staging directory
-    cp /home/builder/aur/$pkg/${pkg}-${pkgver}*.pkg.tar* /aur
+    cp /home/builder/aur/$pkg/${pkg}-*.pkg.* /aur
 done
-
+ 
