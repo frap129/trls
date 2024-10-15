@@ -18,6 +18,7 @@ for pkg in "$@"; do
     # Check if package exists in cache before building
     need_build=false
     for filename in "$(su builder -c 'makepkg --packagelist')"; do
+        filename="$(echo $filename | rev | cut -d/ -f1 | rev)"
         if [[ -f "$filename" ]]; then
             echo "$filename already built"
         else

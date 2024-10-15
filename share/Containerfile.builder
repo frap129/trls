@@ -42,6 +42,7 @@ RUN echo 'root:1000:5000' > /etc/subgid
 RUN pacman --noconfirm -Syu base-devel git sudo
 RUN useradd -m builder
 RUN echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/builder
+RUN sed -i "s/debug lto/!debug lto/g" /etc/makepkg.conf
 USER builder
 RUN mkdir /home/builder/aur/
 USER root
