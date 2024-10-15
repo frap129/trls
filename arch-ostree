@@ -212,8 +212,10 @@ build_rootfs_container() {
 		# Handle tag for final image
 		if [[ "$build_stage" == "${build_stages[-1]}" ]]; then
 			tag="$rootfs_tag"
+		elif [[ "$stage" != "$group" ]]; then
+			tag="arch-ostree-${group}-${stage}"
 		else
-			tag="arch-ostree-$stage"
+			tag="arch-ostree-${stage}"
 		fi
 
 		# Build requested stage, using the previous stage as a base
