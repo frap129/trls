@@ -227,10 +227,11 @@ build_rootfs_container() {
 			--cap-add sys_admin \
 			--cap-add mknod \
 			-f "$(find $src_dir -name "Containerfile.$group")" \
-			--build-arg BASE_IMAGE="localhost/arch-ostree-$last_stage" \
+			--build-arg BASE_IMAGE="localhost/$last_stage" \
 			--target $stage \
 			-t "$tag"
-		last_stage="$stage"
+
+		last_stage="$tag"
 	done
 }
 
