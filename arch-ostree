@@ -16,7 +16,7 @@ sysroot_dir="/mnt"
 podman_build_cache=false
 deploy_env_dir="$scriptdir/deployment"
 src_dir="$scriptdir/src"
-build_stages=()
+rootfs_stages=()
 extra_contexts=()
 rootfs_tag="archlinux-ostree-rootfs"
 
@@ -66,7 +66,7 @@ CONTAINER OPTIONS:
         A comma delimited list of container build contexts to be used for the
         build.
         Default: undefined, thus no extra build contexts will be used.
-    --build-stages <image stages>
+    --rootfs-stages <image stages>
         A comma delimted list of the image stages to build. The stages are
         built in order and commited as images tagged "arch-ostree-tmp-<stage>".
         The final stage is tagged as --rootfs-tag. A build arg
@@ -199,7 +199,7 @@ build_builder_container() {
 build_rootfs_container() {
 	# Build all requested build stages
 	last_stage=""
-	for build_stage in "${build_stages[@]}"; do
+	for build_stage in "${rootfs_stages[@]}"; do
 		# Parse build group and build stage
 		if [[ "$build_stage" == *":"* ]]; then
 			group=$(cut -d: -f1 <<< "$build_stage")
@@ -210,7 +210,7 @@ build_rootfs_container() {
 		fi
 
 		# Handle tag for final image
-		if [[ "$build_stage" == "${build_stages[-1]}" ]]; then
+		if [[ "$build_stage" == "${rootfs_stages[-1]}" ]]; then
 			tag="$rootfs_tag"
 		elif [[ "$stage" != "$group" ]]; then
 			tag="arch-ostree-${group}-${stage}"
@@ -264,7 +264,7 @@ long_opts=(
 	aur-cache:
 	podman-build-cache:
 	src-dir:
-	build-stages:
+	rootfs-stages:
 	extra-contexts:
 	rootfs-tag:
 	sysroot-dir:
@@ -295,7 +295,7 @@ while true; do
 		shift 2
 		continue
 		;;
-	'--build-stages' | \
+	'--rootfs-stages' | \
 		'--extra-contexts')
 		name="$(arg_to_varname "$1")"
 		readarray -td, $name <<< $2
