@@ -283,10 +283,10 @@ while true; do
 		shift 2
 		continue
 		;;
-	'--deploy-env-dir' | \
+	'--aur-cache' | \
+		'--deploy-env-dir' | \
 		'--ostree-repo' | \
 		'--pacman-cache' | \
-		'--aur-cache' | \
 		'--src-dir' | \
 		'--sysroot-dir')
 		name="$(arg_to_varname "$1")"
@@ -295,8 +295,8 @@ while true; do
 		shift 2
 		continue
 		;;
-	'--rootfs-stages' | \
-		'--extra-contexts')
+	'--extra-contexts' | \
+		'--rootfs-stages')
 		name="$(arg_to_varname "$1")"
 		readarray -td, $name <<< $2
 		shift 2
