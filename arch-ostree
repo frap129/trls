@@ -10,6 +10,7 @@ share_dir="$scriptdir/share"
 # shellcheck source=lib/common.sh
 source "$lib_dir/common.sh"
 
+builder_stages=""
 builder_tag="archlinux-ostree-builder"
 ostree_repo="/sysroot/ostree/repo"
 sysroot_dir="/mnt"
@@ -31,6 +32,18 @@ USAGE: ${0##*/} [options] [command] [arg...]
 all value options may be defined in $scriptdir/arch-ostree.config
 
 COMMON OPTIONS:
+    --builder-stages <name>
+        A comma delimted list of the image stages to build. The stages are
+        built in order and commited as images tagged "arch-ostree-builder-<stage>".
+        The final stage is tagged as --builder-tag. A build arg
+        BASE_IMAGE="localhost/arch-ostree-builder-<previous stage>"
+        is passed durring the each build, to allow build stages to be
+        dyanmically combined. Stages are expected to be defined in a file named
+        "Containerfile.<stage>". Should multiple stages be defined in the same
+        file, they should be added to this list as "<group>:<stage>", where
+        <group> is the extension of the Containerfile they are defined in.
+        Default: undefined, thus the container defined in
+        $share_dir/Containerfile.builder is used.
     --builder-tag <name>
         Name of the tag to use for the pacstrap container.
         Default: archlinux-ostree-builder
@@ -68,7 +81,7 @@ CONTAINER OPTIONS:
         Default: undefined, thus no extra build contexts will be used.
     --rootfs-stages <image stages>
         A comma delimted list of the image stages to build. The stages are
-        built in order and commited as images tagged "arch-ostree-tmp-<stage>".
+        built in order and commited as images tagged "arch-ostree-rootfs-<stage>".
         The final stage is tagged as --rootfs-tag. A build arg
         BASE_IMAGE="localhost/arch-ostree-tmp-<previous stage>"
         is passed durring the each build, to allow build stages to be
@@ -189,17 +202,16 @@ deploy_env() {
 	chroot "$deploy_env_dir" "${args[@]}"
 }
 
-build_builder_container() {
-	podman build \
-		"${podman_build_cache_args[@]}" \
-		-f "$share_dir/Containerfile.builder" \
-		-t "$builder_tag"
-}
+_multistage_container_build() {
+	tmp_name=$1
+	final_tag=$2
+	build_cmd=$3
+	shift 3
+	build_stages=("$@")
 
-build_rootfs_container() {
 	# Build all requested build stages
 	last_stage=""
-	for build_stage in "${rootfs_stages[@]}"; do
+	for build_stage in "${build_stages[@]}"; do
 		# Parse build group and build stage
 		if [[ "$build_stage" == *":"* ]]; then
 			group=$(cut -d: -f1 <<< "$build_stage")
@@ -210,22 +222,16 @@ build_rootfs_container() {
 		fi
 
 		# Handle tag for final image
-		if [[ "$build_stage" == "${rootfs_stages[-1]}" ]]; then
-			tag="$rootfs_tag"
+		if [[ "$build_stage" == "${build_stages[-1]}" ]]; then
+			tag="$final_tag"
 		elif [[ "$stage" != "$group" ]]; then
-			tag="arch-ostree-${group}-${stage}"
+			tag="arch-ostree-${tmp_name}-${group}-${stage}"
 		else
-			tag="arch-ostree-${stage}"
+			tag="arch-ostree-${tmp_name}-${stage}"
 		fi
 
 		# Build requested stage, using the previous stage as a base
-		podman build \
-			${podman_build_cache_args[@]} \
-			${podman_build_context_args[@]} \
-			${pacman_cache_args[@]} \
-			${aur_cache_args[@]} \
-			--cap-add sys_admin \
-			--cap-add mknod \
+		$build_cmd \
 			-f "$(find $src_dir -name "Containerfile.$group")" \
 			--build-arg BASE_IMAGE="localhost/$last_stage" \
 			--target $stage \
@@ -233,6 +239,46 @@ build_rootfs_container() {
 
 		last_stage="$tag"
 	done
+}
+
+_builder_podman_cmd() {
+	podman build \
+		"${podman_build_cache_args[@]}" \
+		--cap-add sys_admin \
+		--cap-add mknod \
+		$@
+}
+
+build_builder_container() {
+	if [[ -z "$builder_stages" ]]; then
+		_builder_podman_cmd \
+			-f "$share_dir/Containerfile.builder" \
+			-t "$builder_tag"
+	else
+		_multistage_container_build \
+			"builder" \
+			"$builder_tag" \
+			"_builder_podman_cmd" \
+			"${builder_stages[@]}"
+	fi
+}
+
+_rootfs_podman_cmd() {
+	podman build \
+		${podman_build_cache_args[@]} \
+		${podman_build_context_args[@]} \
+		${pacman_cache_args[@]} \
+		${aur_cache_args[@]} \
+		--cap-add sys_admin \
+		--cap-add mknod \
+		$@
+}
+build_rootfs_container() {
+	_multistage_container_build \
+		"rootfs" \
+		"$rootfs_tag" \
+		"_rootfs_podman_cmd" \
+		"${rootfs_stages[@]}"
 }
 
 enter_rootfs_container() {
