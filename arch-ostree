@@ -98,6 +98,7 @@ COMMON COMMANDS:
     prepare_live_env
         Prepare currently booted live ISO environment for setting up a new
         ostree installation.
+    build-builder
     build_builder_container
         (Re-)Build pacstrap container that's used by the other commands and tag
         it with --builder-tag.
@@ -421,7 +422,7 @@ case "$command" in
 'prepare_live_env')
 	prepare_live_env
 	;;
-'build_builder_container')
+'build-builder' | 'build_builder_container')
 	build_builder_container
 	;;
 'build' | 'build_rootfs_container')
