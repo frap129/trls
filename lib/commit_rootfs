@@ -99,7 +99,7 @@ ostreeify() {
 lower_fstype="$(stat -f -c '%T' /mnt-lower)"
 if [ "$lower_fstype" = "overlayfs" ]; then
 	echo "overlay detected, use rsync." >&2
-	rsync -aX /mnt-lower/ /mnt
+	rsync -aAX /mnt-lower/ /mnt
 else
 	# Create a temporary overlay FS so none of our rootfs changes are permanent.
 	mkdir /overlay/{upper,work}
