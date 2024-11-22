@@ -6,8 +6,24 @@ chown builder:builder /home/builder/aur -R
 # Ensure package databases are up to date
 pacman -Sy
 
+# Parse input
+pkgs=()
+args="-fcCs --noconfirm --skippgpcheck"
+while test $# -gt 0; do
+  case "$1" in
+    -*)
+      args="$args $1"
+      shift
+      ;;
+    *)
+      pkgs+=("$1")
+      shift
+      ;;
+  esac
+done
+
 # Build requested packages
-for pkg in "$@"; do
+for pkg in "${pkgs[@]}"; do
     if [[ ! -d "/home/builder/aur/$pkg" ]]; then
         # Get sources
         su builder -c "git clone https://aur.archlinux.org/$pkg.git /home/builder/aur/$pkg"
@@ -32,7 +48,7 @@ for pkg in "$@"; do
     done
 
     # Build package
-    ($need_build) && su builder -c "makepkg -fcCs --noconfirm --skippgpcheck"
+    ($need_build) && su builder -c "makepkg $args"
 
     # Copy to staging directory
     cp /home/builder/aur/$pkg/${pkg}-*.pkg.* /aur
