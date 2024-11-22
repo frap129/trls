@@ -3,6 +3,9 @@
 # Ensure we have proper permisions
 chown builder:builder /home/builder/aur -R
 
+# Ensure package databases are up to date
+pacman -Sy
+
 # Build requested packages
 for pkg in "$@"; do
     if [[ ! -d "/home/builder/aur/$pkg" ]]; then
@@ -23,6 +26,7 @@ for pkg in "$@"; do
             echo "$filename already built"
         else
             need_build=true
+            rm *.pkg.tar.zst
             break
         fi
     done
