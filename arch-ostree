@@ -247,6 +247,7 @@ _multistage_container_build() {
 _builder_podman_cmd() {
 	podman build \
 		"${podman_build_cache_args[@]}" \
+		--net=host \
 		--cap-add sys_admin \
 		--cap-add mknod \
 		$@
@@ -272,6 +273,7 @@ _rootfs_podman_cmd() {
 		${podman_build_context_args[@]} \
 		${pacman_cache_args[@]} \
 		${aur_cache_args[@]} \
+		--net=host \
 		--cap-add sys_admin \
 		--cap-add mknod \
 		$@
@@ -286,6 +288,7 @@ build_rootfs_container() {
 
 enter_rootfs_container() {
 	podman run \
+		--net=host \
 		--rm -it \
 		"localhost/$rootfs_tag" \
 		"$@"
@@ -293,6 +296,7 @@ enter_rootfs_container() {
 
 commit_rootfs_container() {
 	podman run \
+		--net=host \
 		--cap-add sys_admin \
 		--security-opt apparmor=unconfined \
 		--mount "type=image,src=localhost/$rootfs_tag,dst=/mnt-lower" \
