@@ -114,6 +114,8 @@ CONTAINER COMMANDS:
     build_rootfs_container
         Build all requested stages from files in --src-dir and tag it with
         --rootfs-tag.
+    clean
+        Remove unused container images.
     commit -- [arg...]
     commit_rootfs_container -- [arg...]
         Commit --rootfs-tag container to --ostree-repo. This tool provides
@@ -215,8 +217,8 @@ _multistage_container_build() {
 	for build_stage in "${build_stages[@]}"; do
 		# Parse build group and build stage
 		if [[ "$build_stage" == *":"* ]]; then
-			group=$(cut -d: -f1 <<< "$build_stage")
-			stage=$(cut -d: -f2 <<< "$build_stage")
+			group=$(cut -d: -f1 <<<"$build_stage")
+			stage=$(cut -d: -f2 <<<"$build_stage")
 		else
 			group="$build_stage"
 			stage="$build_stage"
@@ -345,7 +347,7 @@ while true; do
 	'--extra-contexts' | \
 		'--rootfs-stages')
 		name="$(arg_to_varname "$1")"
-		readarray -td, $name <<< $2
+		readarray -td, $name <<<$2
 		shift 2
 		continue
 		;;
@@ -437,6 +439,9 @@ case "$command" in
 'deploy_env')
 	args=("$@")
 	unshare -m bash -c "set -euo pipefail; $(declare_all); deploy_env"
+	;;
+'clean')
+	podman system prune
 	;;
 *)
 	die "Unsupported command: ${command}"
