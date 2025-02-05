@@ -20,6 +20,7 @@ src_dir="$scriptdir/src"
 rootfs_stages=()
 extra_contexts=()
 rootfs_tag="archlinux-ostree-rootfs"
+branch=""
 
 # shellcheck source=arch-ostree.config.example
 [[ -f "$scriptdir/arch-ostree.config" ]] && source "$scriptdir/arch-ostree.config"
@@ -32,6 +33,10 @@ USAGE: ${0##*/} [options] [command] [arg...]
 all value options may be defined in $scriptdir/arch-ostree.config
 
 COMMON OPTIONS:
+    --branch <name>
+        The name of the ostree branch to commit/deploy to. Only valid for the
+        commit and deploy commands.
+        Default: undefined, must be provided
     --builder-stages <name>
         A comma delimted list of the image stages to build. The stages are
         built in order and commited as images tagged "arch-ostree-builder-<stage>".
@@ -118,9 +123,9 @@ CONTAINER COMMANDS:
         Remove unused container images.
     commit -- [arg...]
     commit_rootfs_container -- [arg...]
-        Commit --rootfs-tag container to --ostree-repo. This tool provides
-        --repo and --tree-dir to "ostree commit". Everything else
-        (like branch name) can and has to be provided by you.
+        Commit --rootfs-tag container to --ostree-repo on --branch. This tool
+        provides --repo, --tree-dir, and --branch to "ostree commit". You may
+        append your own additional options
     enter -- [arg...]
     enter_rootfs_container -- [arg...]
         Enter --rootfs-tag container. All changes will be lost.
@@ -329,7 +334,8 @@ fi
 eval set -- "$temp"
 while true; do
 	case "$1" in
-	'--builder-tag' | \
+	'--branch' | \
+		'--builder-tag' | \
 		'--rootfs-tag')
 		name="$(arg_to_varname "$1")"
 		printf -v "$name" "%s" "$2"
@@ -438,7 +444,7 @@ case "$command" in
 	enter_rootfs_container "$@"
 	;;
 'commit' | 'commit_rootfs_container')
-	commit_rootfs_container "$@"
+	commit_rootfs_container -b "$branch" "$@"
 	;;
 'deploy_env')
 	args=("$@")

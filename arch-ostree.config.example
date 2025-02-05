@@ -4,6 +4,7 @@
 # change.
 # 'scriptdir' refers to the path of the arch-ostree checkout
 
+branch="archlinux"
 builder_stages=()
 builder_tag="archlinux-ostree-builder"
 ostree_repo="/sysroot/ostree/repo"
