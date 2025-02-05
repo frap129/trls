@@ -23,6 +23,7 @@ rootfs_tag="archlinux-ostree-rootfs"
 branch=""
 
 # shellcheck source=arch-ostree.config.example
+[[ -f "/etc/arch-ostree.config" ]] && source "/etc/arch-ostree.config"
 [[ -f "$scriptdir/arch-ostree.config" ]] && source "$scriptdir/arch-ostree.config"
 
 usage() {
