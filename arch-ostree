@@ -126,9 +126,16 @@ CONTAINER COMMANDS:
         Commit --rootfs-tag container to --ostree-repo on --branch. This tool
         provides --repo, --tree-dir, and --branch to "ostree commit". You may
         append your own additional options
+    deploy -- [arg...]
+       Deploy the latest commit on --brancyh to ostree. This tool provides the
+       refspec (branch) to "ostree admin deploy". You may append your own
+       aditional options
     enter -- [arg...]
     enter_rootfs_container -- [arg...]
         Enter --rootfs-tag container. All changes will be lost.
+    update
+        A macro command that runs build, commit, and deploy to simplify the
+        update process.
 EOF
 }
 
@@ -452,6 +459,15 @@ case "$command" in
 	;;
 'clean')
 	podman system prune
+	;;
+'deploy')
+	ostree admin deploy "$branch" "$@"
+	;;
+'update')
+	build_rootfs_container
+	commit_rootfs_container -b "$branch"
+	ostree admin deploy "$branch"
+	echo "Update sucessful. Reboot to apply"
 	;;
 *)
 	die "Unsupported command: ${command}"
