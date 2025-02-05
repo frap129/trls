@@ -80,7 +80,7 @@ create_initramfs() {
 	cat \
 		"${ucode_images[@]}" \
 		"$rootfs/boot/initramfs-${kernel_pkg}.img" \
-		>"$kmod_dir/initramfs.img"
+		> "$kmod_dir/initramfs.img"
 }
 
 ostreeify() {
@@ -94,11 +94,6 @@ ostreeify() {
 	# This is not needed. We only need the directory as a mountpoint.
 	rm -r "${rootfs:?}/boot"
 	mkdir "$rootfs/boot"
-}
-
-fix_caps() {
-	# Manually set capabilities for binaries that lost them
-	[ -f "$rootfs/usr/bin/fusermount3" ] && setcap "cap_sys_admin=ep" "$rootfs/usr/bin/fusermount3"
 }
 
 lower_fstype="$(stat -f -c '%T' /mnt-lower)"
@@ -119,6 +114,5 @@ move_to_var
 clean_rootfs
 create_initramfs
 ostreeify
-fix_caps
 
 ostree commit --repo /sysroot/ostree/repo --tree=dir=/mnt "$@"
