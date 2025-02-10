@@ -314,6 +314,7 @@ commit_rootfs_container() {
 		--security-opt apparmor=unconfined \
 		--mount "type=image,src=localhost/$rootfs_tag,dst=/mnt-lower" \
 		--mount "type=bind,src=$ostree_repo,dst=/sysroot/ostree/repo" \
+		--mount "type=bind,src=/var/lib/sbctl,dst=/var/lib/sbctl" \
 		-v "$lib_dir:/opt/lib:ro" \
 		-v "$share_dir:/opt/share:ro" \
 		--rm -it \
