@@ -1,12 +1,12 @@
-# Configure settings for arch-ostree
+# Configure settings for trellis
 # The values in this example config are the defaults. In your
-# arch-ostree.config, you only need to define the values you wish to
+# trellis.config, you only need to define the values you wish to
 # change.
-# 'scriptdir' refers to the path of the arch-ostree checkout
+# 'scriptdir' refers to the path of the trellis checkout
 
-branch="archlinux"
+branch="trellis"
 builder_stages=()
-builder_tag="archlinux-ostree-builder"
+builder_tag="trellis-builder"
 ostree_repo="/sysroot/ostree/repo"
 sysroot_dir="/mnt"
 deploy_env_dir="$scriptdir/deployment"
@@ -16,4 +16,4 @@ pacman_cache=
 aur_cache=
 build_stages=()
 extra_contexts=()
-rootfs_tag="archlinux-ostree-rootfs"
+rootfs_tag="trellis-rootfs"

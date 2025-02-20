@@ -1,7 +1,8 @@
-# arch-ostree
+# trls
+> short for "trellis"
 
 A (WIP) tool for building modular, layered archlinux OCI containers and
-deploying them to OSTree tree.
+deploying via bootc.
 
 This is currently experimental software, no setup guide is available at this
 time.
@@ -13,7 +14,7 @@ and guide.
   GRUB2 and for making this work without Fedora.
 - [ostreedev](https://github.com/ostreedev) for the awesome OSTree project.
 - [Arch Linux](https://archlinux.org) for an awesome Linux distro.
-- [containers](https://github.com/containers) for podman.
+- [containers](https://github.com/containers) for podman and bootc.
 - [Universal Blue](https://github.com/ublue-os) for inspiring the modular
 approach to building the rootfs.
 
