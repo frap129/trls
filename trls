@@ -5,7 +5,6 @@ set -euo pipefail
 
 scriptdir="$(dirname "$(readlink -f "$0")")"
 lib_dir="$scriptdir/lib"
-share_dir="$scriptdir/share"
 
 # shellcheck source=lib/common.sh
 source "$lib_dir/common.sh"
@@ -17,8 +16,10 @@ sysroot_dir="/mnt"
 podman_build_cache=false
 deploy_env_dir="$scriptdir/deployment"
 src_dir="$scriptdir/src"
+hooks_dir="/etc/trellis-hooks.d"
 rootfs_stages=()
 extra_contexts=()
+extra_mounts=()
 rootfs_tag="trellis-rootfs"
 branch=""
 
@@ -72,6 +73,9 @@ COMMON OPTIONS:
         Path to the directory where your rootfs and all your partitions
         (like boot or efi) are mounted.
         Default: /mnt
+      --sysroot-dir
+        Path to the directory where your trellis build hooks are stored. 
+        Default: /etc/trellis-hooks.d
     --help
         Print this help message
 
@@ -84,6 +88,10 @@ CONTAINER OPTIONS:
         A comma delimited list of container build contexts to be used for the
         build.
         Default: undefined, thus no extra build contexts will be used.
+    --extra-mounts <paths>
+        A comma delimited list of directories or files to be bind mounted during
+        the build.
+        Default: undefined, thus no extra mounts will be used.
     --rootfs-stages <image stages>
         A comma delimted list of the image stages to build. The stages are
         built in order and commited as images tagged "trellis-stage-<stage>".
@@ -270,6 +278,8 @@ _rootfs_podman_cmd() {
 		${podman_build_context_args[@]} \
 		${pacman_cache_args[@]} \
 		${aur_cache_args[@]} \
+		${hooks_args[@]} \
+		${extra_mount_args[@]} \
 		--net=host \
 		--cap-add sys_admin \
 		--cap-add mknod \
@@ -325,6 +335,7 @@ while true; do
 		'--deploy-env-dir' | \
 		'--ostree-repo' | \
 		'--pacman-cache' | \
+		'--hooks-dir' | \
 		'--src-dir' | \
 		'--sysroot-dir')
 		name="$(arg_to_varname "$1")"
@@ -334,6 +345,7 @@ while true; do
 		continue
 		;;
 	'--extra-contexts' | \
+		'--extra-mounts' | \
 		'--rootfs-stages')
 		name="$(arg_to_varname "$1")"
 		readarray -td, $name <<<$2
@@ -406,6 +418,21 @@ podman_build_context_args=()
 for context in "${extra_contexts[@]}"; do
 	podman_build_context_args+=(
 		--build-context $context
+	)
+done
+
+hooks_args=()
+# shellcheck disable=SC2236 # This doesn't work with -n
+if [ ! -z ${hooks_dir+x} ]; then
+	hooks_args=(
+		-v "$hooks_dir:/hooks"
+	)
+fi
+
+extra_mount_args=()
+for mount in "${extra_mounts[@]}"; do
+	extra_mount_args+=(
+		-v "$mount:$mount"
 	)
 done
 
