@@ -8,7 +8,7 @@ sbctl create-keys --quiet
 
 # Sign vmlinuz and all .efi files
 vmlinuz=$(find /usr/lib/modules -name vmlinuz)
-readarray -d '' files_to_sign < <(find $rootfs/ -name "*.efi" -print0)
+readarray -d '' files_to_sign < <(find / -name "*.efi" -print0)
 files_to_sign+=("$vmlinuz")
 for file in "${files_to_sign[@]}"; do
   sbctl sign "${file}"
