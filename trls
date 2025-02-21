@@ -5,17 +5,20 @@ set -euo pipefail
 
 scriptdir="$(dirname "$(readlink -f "$0")")"
 lib_dir="$scriptdir/lib"
+config_dir="/etc/trellis"
+config_file="$config_dir/trellis.conf"
+hooks_dir="$config_dir/hooks.d"
 
 # shellcheck source=lib/common.sh
 source "$lib_dir/common.sh"
 
+# Option defaults
 builder_stages=""
 builder_tag="trellis-builder"
 ostree_repo="/sysroot/ostree/repo"
 sysroot_dir="/mnt"
 podman_build_cache=false
 src_dir="$scriptdir/src"
-hooks_dir="/etc/trellis-hooks.d"
 rootfs_stages=()
 extra_contexts=()
 extra_mounts=()
@@ -65,7 +68,7 @@ COMMON OPTIONS:
         Path to the directory where your rootfs and all your partitions
         (like boot or efi) are mounted.
         Default: $sysroot_dir
-      --sysroot-dir
+    --sysroot-dir
         Path to the directory where your trellis build hooks are stored. 
         Default: $hooks_dir
     --help
@@ -122,9 +125,8 @@ CONTAINER COMMANDS:
 EOF
 }
 
-# shellcheck source=trellis.config.example
-[[ -f "/etc/trellis.config" ]] && source "/etc/trellis.config"
-[[ -f "$scriptdir/trellis.config" ]] && source "$scriptdir/trellis.config"
+# shellcheck source=trellis.conf.example
+[[ -f "$config_file" ]] && source "$config_file"
 
 prepare_live_env() {
 	msg "Install required packages"
@@ -266,7 +268,6 @@ while true; do
 	'--aur-cache' | \
 		'--ostree-repo' | \
 		'--pacman-cache' | \
-		'--hooks-dir' | \
 		'--src-dir' | \
 		'--sysroot-dir')
 		name="$(arg_to_varname "$1")"
@@ -335,7 +336,7 @@ aur_cache_args=()
 if [ ! -z ${aur_cache+x} ]; then
 	mkdir -p "$aur_cache"
 	aur_cache_args=(
-		-v "$aur_cache:/aur-cache"
+		-v "$aur_cache:/var/cache/trellis/aur"
 	)
 fi
 
@@ -356,7 +357,8 @@ hooks_args=()
 # shellcheck disable=SC2236 # This doesn't work with -n
 if [ ! -z ${hooks_dir+x} ]; then
 	hooks_args=(
-		-v "$hooks_dir:/hooks"
+		-v "$hooks_dir:$hooks_dir"
+		--build-arg "HOOKS_DIR=$hooks_dir"
 	)
 fi
 

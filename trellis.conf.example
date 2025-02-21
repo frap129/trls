@@ -9,7 +9,6 @@ builder_stages=()
 builder_tag="trellis-builder"
 ostree_repo="/sysroot/ostree/repo"
 sysroot_dir="/mnt"
-deploy_env_dir="$scriptdir/deployment"
 src_dir="$scriptdir/setup"
 podman_build_cache=false
 pacman_cache=
