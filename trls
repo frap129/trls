@@ -14,6 +14,8 @@ builder_tag="trellis-builder"
 ostree_repo="/sysroot/ostree/repo"
 sysroot_dir="/mnt"
 podman_build_cache=false
+pacman_cache="/var/cache/pacman/pkg"
+aur_cache="/var/cache/trellis/aur"
 src_dir="$scriptdir/src"
 rootfs_stages=()
 extra_contexts=()
@@ -26,7 +28,7 @@ usage() {
 USAGE: ${0##*/} [options] [command] [arg...]
 
 <bool> is a value of 0, false, no, 1, true or yes.
-all value options may be defined in $scriptdir/arch-ostree.config
+all value options may be defined in $config_file
 
 COMMON OPTIONS:
     --branch <name>
@@ -55,11 +57,13 @@ COMMON OPTIONS:
         --no-cache option and buildahs BUILDAH_LAYERS environment variable.
         Default: $podman_build_cache
     --pacman-cache <path>
-        Path to a persistent pacman package cache.
-        Default: undefined, thus the pacman cache is disabled.
+        Path to a persistent pacman package cache. If unset, pacman cache will
+        will not be used in the build.
+        Default: $pacman_cache
     --aur-cache <path>
-        Path to use as a persistent AUR package build cache.
-        Default: undefined, thus the aur cache is disabled.
+        Path to use as a persistent AUR package build cache. If unset, aur
+        packages will not be used in the build.
+        Default: $aur_cache
     --sysroot-dir
         Path to the directory where your rootfs and all your partitions
         (like boot or efi) are mounted.
