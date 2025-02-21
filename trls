@@ -11,8 +11,6 @@ hooks_dir="$config_dir/hooks.d"
 # Option defaults
 builder_stages=""
 builder_tag="trellis-builder"
-ostree_repo="/sysroot/ostree/repo"
-sysroot_dir="/mnt"
 podman_build_cache=false
 pacman_cache="/var/cache/pacman/pkg"
 aur_cache="/var/cache/trellis/aur"
@@ -21,7 +19,6 @@ rootfs_stages=()
 extra_contexts=()
 extra_mounts=()
 rootfs_tag="trellis-rootfs"
-branch=""
 
 # Source: https://github.com/archlinux/arch-install-scripts/blob/4802e1197e43e300e8fc545b7b2a0358ad2f920b/common#L75
 # shellcheck disable=SC2059 # $1 and $2 can contain the printf modifiers
@@ -76,11 +73,23 @@ USAGE: ${0##*/} [options] [command] [arg...]
 <bool> is a value of 0, false, no, 1, true or yes.
 all value options may be defined in $config_file
 
-COMMON OPTIONS:
-    --branch <name>
-        The name of the ostree branch to commit/deploy to. Only valid for the
-        commit and deploy commands.
-        Default: undefined, must be provided
+COMMANDS:
+    build-builder
+        (Re-)Build pacstrap container that's used by the other commands and tag
+        it with --builder-tag.
+    build	
+        Build all requested stages from files in --src-dir and tag it with
+        --rootfs-tag.
+    clean
+        Remove unused container images.
+    run [args...] -- <cmd>
+        Run <cmd> in the latest --rootfs-tag container. All changes will be
+        lost.
+    update
+        A macro command that runs "${0##*/} build" and "bootc upgrade" to
+        simplify the update process.
+
+OPTIONS:
     --builder-stages <name>
         A comma delimted list of the image stages to build. The stages are
         built in order and commited as images tagged "trellis-builder-<stage>".
@@ -95,9 +104,6 @@ COMMON OPTIONS:
     --builder-tag <name>
         Name of the tag to use for the pacstrap container.
         Default: $builder_tag
-    --ostree-repo <path>
-        Path to the ostree repository.
-        Default: $ostree_repo
     --podman-build-cache <bool>
         Enable/Disable podman build cache. Boolean. This controls both podmans
         --no-cache option and buildahs BUILDAH_LAYERS environment variable.
@@ -110,18 +116,7 @@ COMMON OPTIONS:
         Path to use as a persistent AUR package build cache. If unset, aur
         packages will not be used in the build.
         Default: $aur_cache
-    --sysroot-dir
-        Path to the directory where your rootfs and all your partitions
-        (like boot or efi) are mounted.
-        Default: $sysroot_dir
-    --sysroot-dir
-        Path to the directory where your trellis build hooks are stored. 
-        Default: $hooks_dir
-    --help
-        Print this help message
-
-CONTAINER OPTIONS:
-    --src-dir <path>
+      --src-dir <path>
         Path to the directory with Containerfiles and setup files that build
         the rootfs.
         Default: $src_dir
@@ -147,54 +142,13 @@ CONTAINER OPTIONS:
     --rootfs-tag <name>
         Name of the tag to use for the rootfs container.
         Default: $rootfs_tag
-
-COMMON COMMANDS:
-    prepare_live_env
-        Prepare currently booted live ISO environment for setting up a new
-        ostree installation.
-    build-builder
-        (Re-)Build pacstrap container that's used by the other commands and tag
-        it with --builder-tag.
-
-CONTAINER COMMANDS:
-    build	
-        Build all requested stages from files in --src-dir and tag it with
-        --rootfs-tag.
-    clean
-        Remove unused container images.
-    run [args...] -- <cmd>
-        Run <cmd> in the latest --rootfs-tag container. All changes will be
-        lost.
-    update
-        A macro command that runs "${0##*/} build" and "bootc upgrade" to
-        simplify the update process.
+    --help
+        Print this help message
 EOF
 }
 
 # shellcheck source=trellis.conf.example
 [[ -f "$config_file" ]] && source "$config_file"
-
-prepare_live_env() {
-	msg "Install required packages"
-	pacman \
-		--needed \
-		--noconfirm \
-		-S \
-		ostree \
-		podman
-
-	msg "Patch storage.conf"
-	sed -i \
-		-e 's|^\(graphroot\s*=\s*\).*|\1"/mnt/setup/container-storage"|g' \
-		/etc/containers/storage.conf
-
-	msg "Patch containers.conf"
-	sed -i \
-		-e 's|^# \(image_copy_tmp_dir\s*=\s*\).*|\1"/mnt/setup/container-tmp"|g' \
-		/etc/containers/containers.conf
-
-	mkdir -p "/mnt/setup/container-tmp"
-}
 
 _multistage_container_build() {
 	tmp_name=$1
@@ -286,7 +240,6 @@ run_rootfs_container() {
 long_opts=(
 	builder-tag:
 	help
-	ostree-repo:
 	pacman-cache:
 	aur-cache:
 	podman-build-cache:
@@ -294,7 +247,6 @@ long_opts=(
 	rootfs-stages:
 	extra-contexts:
 	rootfs-tag:
-	sysroot-dir:
 )
 if ! temp=$(getopt -o '' --long "$(join_by , "${long_opts[@]}")" -- "$@"); then
 	die "Invalid arguments"
@@ -303,8 +255,7 @@ fi
 eval set -- "$temp"
 while true; do
 	case "$1" in
-	'--branch' | \
-		'--builder-tag' | \
+	'--builder-tag' | \
 		'--rootfs-tag')
 		name="$(arg_to_varname "$1")"
 		printf -v "$name" "%s" "$2"
@@ -314,8 +265,7 @@ while true; do
 	'--aur-cache' | \
 		'--ostree-repo' | \
 		'--pacman-cache' | \
-		'--src-dir' | \
-		'--sysroot-dir')
+		'--src-dir')
 		name="$(arg_to_varname "$1")"
 		value="$(realpath "$2")"
 		printf -v "$name" "%s" "$value"
@@ -416,9 +366,6 @@ for mount in "${extra_mounts[@]}"; do
 done
 
 case "$command" in
-'prepare_live_env')
-	prepare_live_env
-	;;
 'build-builder')
 	build_builder_container
 	;;
