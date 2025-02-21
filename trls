@@ -23,10 +23,6 @@ extra_mounts=()
 rootfs_tag="trellis-rootfs"
 branch=""
 
-# shellcheck source=trellis.config.example
-[[ -f "/etc/trellis.config" ]] && source "/etc/trellis.config"
-[[ -f "$scriptdir/trellis.config" ]] && source "$scriptdir/trellis.config"
-
 usage() {
 	cat <<EOF
 USAGE: ${0##*/} [options] [command] [arg...]
@@ -52,17 +48,17 @@ COMMON OPTIONS:
         Default: undefined.
     --builder-tag <name>
         Name of the tag to use for the pacstrap container.
-        Default: trellis-builder
+        Default: $builder_tag
     --deploy-env-dir <path>
         Path to the directory that's used as the deployment environment.
-        Default: $scriptdir/deployment
+        Default: $deploy_env_dir
     --ostree-repo <path>
         Path to the ostree repository.
-        Default: /sysroot/ostree/repo
+        Default: $ostree_repo
     --podman-build-cache <bool>
         Enable/Disable podman build cache. Boolean. This controls both podmans
         --no-cache option and buildahs BUILDAH_LAYERS environment variable.
-        Default: no.
+        Default: $podman_build_cache
     --pacman-cache <path>
         Path to a persistent pacman package cache.
         Default: undefined, thus the pacman cache is disabled.
@@ -72,10 +68,10 @@ COMMON OPTIONS:
     --sysroot-dir
         Path to the directory where your rootfs and all your partitions
         (like boot or efi) are mounted.
-        Default: /mnt
+        Default: $sysroot_dir
       --sysroot-dir
         Path to the directory where your trellis build hooks are stored. 
-        Default: /etc/trellis-hooks.d
+        Default: $hooks_dir
     --help
         Print this help message
 
@@ -83,7 +79,7 @@ CONTAINER OPTIONS:
     --src-dir <path>
         Path to the directory with Containerfiles and setup files that build
         the rootfs.
-        Default: $scriptdir/src
+        Default: $src_dir
     --extra-contexts <build contexts>
         A comma delimited list of container build contexts to be used for the
         build.
@@ -105,7 +101,7 @@ CONTAINER OPTIONS:
         Default: undefined, thus no images will be built.
     --rootfs-tag <name>
         Name of the tag to use for the rootfs container.
-        Default: trellis-rootfs
+        Default: $rootfs_tag
 
 COMMON COMMANDS:
     prepare_live_env
@@ -137,6 +133,10 @@ CONTAINER COMMANDS:
         simplify the update process.
 EOF
 }
+
+# shellcheck source=trellis.config.example
+[[ -f "/etc/trellis.config" ]] && source "/etc/trellis.config"
+[[ -f "$scriptdir/trellis.config" ]] && source "$scriptdir/trellis.config"
 
 prepare_live_env() {
 	msg "Install required packages"
