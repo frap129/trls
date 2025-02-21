@@ -14,7 +14,6 @@ builder_tag="trellis-builder"
 ostree_repo="/sysroot/ostree/repo"
 sysroot_dir="/mnt"
 podman_build_cache=false
-deploy_env_dir="$scriptdir/deployment"
 src_dir="$scriptdir/src"
 hooks_dir="/etc/trellis-hooks.d"
 rootfs_stages=()
@@ -49,9 +48,6 @@ COMMON OPTIONS:
     --builder-tag <name>
         Name of the tag to use for the pacstrap container.
         Default: $builder_tag
-    --deploy-env-dir <path>
-        Path to the directory that's used as the deployment environment.
-        Default: $deploy_env_dir
     --ostree-repo <path>
         Path to the ostree repository.
         Default: $ostree_repo
@@ -108,26 +104,18 @@ COMMON COMMANDS:
         Prepare currently booted live ISO environment for setting up a new
         ostree installation.
     build-builder
-    build_builder_container
         (Re-)Build pacstrap container that's used by the other commands and tag
         it with --builder-tag.
-    deploy_env -- [arg...]
-        Spawn a shell with a deployment at --deploy-env-dir as the rootfs.
-        This can be used to install the bootloader and create your first
-        deployment from the arch live ISO.
-        The shell runs inside a chroot that looks similar to a booted ostree
-        environment.
 
 CONTAINER COMMANDS:
     build	
-    build_rootfs_container
         Build all requested stages from files in --src-dir and tag it with
         --rootfs-tag.
     clean
         Remove unused container images.
-    enter -- [arg...]
-    enter_rootfs_container -- [arg...]
-        Enter --rootfs-tag container. All changes will be lost.
+    run [args...] -- <cmd>
+        Run <cmd> in the latest --rootfs-tag container. All changes will be
+        lost.
     update
         A macro command that runs "${0##*/} build" and "bootc upgrade" to
         simplify the update process.
@@ -158,62 +146,6 @@ prepare_live_env() {
 		/etc/containers/containers.conf
 
 	mkdir -p "/mnt/setup/container-tmp"
-}
-
-deploy_env() {
-	# We want to mount everything that the user has mounted at
-	# `sysroot_dir`(usually /mnt). This gives us all of the bootloader
-	# partitions.
-	findmnt_output="$(findmnt \
-		--all \
-		--real \
-		--submounts \
-		--mountpoint "$sysroot_dir" \
-		--list \
-		--noheadings \
-		--output TARGET |
-		tail -n +2)"
-
-	mkdir -p "$deploy_env_dir/etc"
-
-	mount -o ro,bind "$deploy_env_dir" "$deploy_env_dir"
-	mount -o ro,bind "$deploy_env_dir/usr/etc" "$deploy_env_dir/etc"
-
-	for path in /run /tmp /var; do
-		mount -t tmpfs tmpfs "${deploy_env_dir}${path}"
-	done
-
-	for path in home mnt roothome usrlocal srv opt; do
-		mkdir "$deploy_env_dir/var/$path"
-	done
-
-	for path in /dev /proc /sys; do
-		mount --rbind "$path" "${deploy_env_dir}${path}"
-	done
-
-	mount -o rw,bind "$sysroot_dir" "${deploy_env_dir}/sysroot"
-
-	mounted_boot=false
-	if [ -n "$findmnt_output" ]; then
-		while read -r source; do
-			target="$(realpath --relative-to="$sysroot_dir" "$source")"
-			mount -o bind "$source" "${deploy_env_dir}/$target"
-
-			if [ "$target" = "boot" ]; then
-				mounted_boot=true
-			fi
-		done <<<"$findmnt_output"
-	fi
-
-	# In case there is no separate boot partition we need to
-	# bind-mount the boot directory so a `grub-install` within the
-	# deploy env installs to the actual boot directory outside of
-	# the temporary deployment rootfs.
-	if [ -e "$sysroot_dir/boot" ] && [ $mounted_boot = false ]; then
-		mount --mkdir -o bind "$sysroot_dir/boot" "$deploy_env_dir/boot"
-	fi
-
-	chroot "$deploy_env_dir" "${args[@]}"
 }
 
 _multistage_container_build() {
@@ -294,9 +226,10 @@ build_rootfs_container() {
 		"${rootfs_stages[@]}"
 }
 
-enter_rootfs_container() {
+run_rootfs_container() {
 	podman run \
 		--net=host \
+		--cap-add all \
 		--rm -it \
 		"localhost/$rootfs_tag" \
 		"$@"
@@ -304,7 +237,6 @@ enter_rootfs_container() {
 
 long_opts=(
 	builder-tag:
-	deploy-env-dir:
 	help
 	ostree-repo:
 	pacman-cache:
@@ -332,7 +264,6 @@ while true; do
 		continue
 		;;
 	'--aur-cache' | \
-		'--deploy-env-dir' | \
 		'--ostree-repo' | \
 		'--pacman-cache' | \
 		'--hooks-dir' | \
@@ -440,18 +371,14 @@ case "$command" in
 'prepare_live_env')
 	prepare_live_env
 	;;
-'build-builder' | 'build_builder_container')
+'build-builder')
 	build_builder_container
 	;;
-'build' | 'build_rootfs_container')
+'build')
 	build_rootfs_container
 	;;
-'enter' | 'enter_rootfs_container')
-	enter_rootfs_container "$@"
-	;;
-'deploy_env')
-	args=("$@")
-	unshare -m bash -c "set -euo pipefail; $(declare_all); deploy_env"
+'run')
+	run_rootfs_container "$@"
 	;;
 'clean')
 	podman system prune
