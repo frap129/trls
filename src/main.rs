@@ -21,7 +21,7 @@ fn main() -> Result<()> {
             Ok(())
         }
         Err(e) => {
-            eprintln!("====> ERROR: {}", e);
+            eprintln!("====> ERROR: {e}");
             process::exit(1);
         }
     }

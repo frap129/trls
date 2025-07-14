@@ -1,8 +1,7 @@
+use std::{fs, path::PathBuf};
+
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use std::env;
-use std::fs;
-use std::path::PathBuf;
 
 use crate::cli::Cli;
 
@@ -72,128 +71,127 @@ impl TrellisConfig {
         let config_file = PathBuf::from("/etc/trellis/trellis.toml");
         let file_config = if config_file.exists() {
             let content = fs::read_to_string(&config_file)
-                .with_context(|| format!("Failed to read config file: {:?}", config_file))?;
+                .with_context(|| format!("Failed to read config file: {config_file:?}"))?;
             toml::from_str::<Config>(&content)
                 .with_context(|| "Failed to parse config file")?
         } else {
             Config::default()
         };
 
-        let _script_dir = env::current_exe()
-            .context("Failed to get current executable path")?
-            .parent()
-            .unwrap()
-            .to_path_buf();
 
-        // Helper functions to get values from nested config structure
-        let get_builder_stages = || {
-            if !cli.builder_stages.is_empty() {
-                cli.builder_stages.clone()
-            } else {
-                file_config.build.as_ref()
-                    .and_then(|b| b.builder_stages.clone())
-                    .unwrap_or_default()
-            }
+        // Extract configuration with CLI overrides
+        let builder_stages = if !cli.builder_stages.is_empty() {
+            cli.builder_stages
+        } else {
+            file_config
+                .build
+                .as_ref()
+                .and_then(|b| b.builder_stages.clone())
+                .unwrap_or_default()
         };
 
-        let get_rootfs_stages = || {
-            if !cli.rootfs_stages.is_empty() {
-                cli.rootfs_stages.clone()
-            } else {
-                file_config.build.as_ref()
-                    .and_then(|b| b.rootfs_stages.clone())
-                    .unwrap_or_default()
-            }
+        let rootfs_stages = if !cli.rootfs_stages.is_empty() {
+            cli.rootfs_stages
+        } else {
+            file_config
+                .build
+                .as_ref()
+                .and_then(|b| b.rootfs_stages.clone())
+                .unwrap_or_default()
         };
 
-        let get_builder_tag = || {
-            file_config.build.as_ref()
-                .and_then(|b| b.builder_tag.clone())
+        let extra_contexts = if !cli.extra_contexts.is_empty() {
+            cli.extra_contexts
+        } else {
+            file_config
+                .build
+                .as_ref()
+                .and_then(|b| b.extra_contexts.clone())
+                .unwrap_or_default()
         };
 
-        let get_rootfs_tag = || {
-            file_config.build.as_ref()
-                .and_then(|b| b.rootfs_tag.clone())
+        let extra_mounts = if !cli.extra_mounts.is_empty() {
+            cli.extra_mounts
+        } else {
+            file_config
+                .build
+                .as_ref()
+                .and_then(|b| b.extra_mounts.clone())
+                .unwrap_or_default()
         };
 
-        let get_podman_build_cache = || {
-            file_config.build.as_ref()
-                .and_then(|b| b.podman_build_cache)
-        };
-
-        let get_pacman_cache = || {
-            file_config.environment.as_ref()
-                .and_then(|e| e.pacman_cache.clone())
-        };
-
-        let get_aur_cache = || {
-            file_config.environment.as_ref()
-                .and_then(|e| e.aur_cache.clone())
-        };
-
-        let get_src_dir = || {
-            file_config.environment.as_ref()
-                .and_then(|e| e.src_dir.clone())
-        };
-
-        let get_hooks_dir = || {
-            file_config.environment.as_ref()
-                .and_then(|e| e.hooks_dir.clone())
-        };
-
-        let get_extra_contexts = || {
-            if !cli.extra_contexts.is_empty() {
-                cli.extra_contexts.clone()
-            } else {
-                file_config.build.as_ref()
-                    .and_then(|b| b.extra_contexts.clone())
-                    .unwrap_or_default()
-            }
-        };
-
-        let get_extra_mounts = || {
-            if !cli.extra_mounts.is_empty() {
-                cli.extra_mounts.clone()
-            } else {
-                file_config.build.as_ref()
-                    .and_then(|b| b.extra_mounts.clone())
-                    .unwrap_or_default()
-            }
-        };
-
-        let src_dir = cli.src_dir
-            .or(get_src_dir())
+        let src_dir = cli
+            .src_dir
+            .or_else(|| {
+                file_config
+                    .environment
+                    .as_ref()
+                    .and_then(|e| e.src_dir.clone())
+            })
             .unwrap_or_else(|| PathBuf::from("/var/lib/trellis/src"));
 
-        let hooks_dir = get_hooks_dir()
+        let hooks_dir = file_config
+            .environment
+            .as_ref()
+            .and_then(|e| e.hooks_dir.clone())
             .unwrap_or_else(|| PathBuf::from("/etc/trellis/hooks.d"));
 
+        let builder_tag = if cli.builder_tag != "trellis-builder" {
+            cli.builder_tag
+        } else {
+            file_config
+                .build
+                .as_ref()
+                .and_then(|b| b.builder_tag.clone())
+                .unwrap_or_else(|| "trellis-builder".to_string())
+        };
+
+        let rootfs_tag = if cli.rootfs_tag != "trellis-rootfs" {
+            cli.rootfs_tag
+        } else {
+            file_config
+                .build
+                .as_ref()
+                .and_then(|b| b.rootfs_tag.clone())
+                .unwrap_or_else(|| "trellis-rootfs".to_string())
+        };
+
+        let podman_build_cache = cli
+            .podman_build_cache
+            .or_else(|| {
+                file_config
+                    .build
+                    .as_ref()
+                    .and_then(|b| b.podman_build_cache)
+            })
+            .unwrap_or(false);
+
+        let pacman_cache = cli.pacman_cache.or_else(|| {
+            file_config
+                .environment
+                .as_ref()
+                .and_then(|e| e.pacman_cache.clone())
+        });
+
+        let aur_cache = cli.aur_cache.or_else(|| {
+            file_config
+                .environment
+                .as_ref()
+                .and_then(|e| e.aur_cache.clone())
+        });
+
         Ok(TrellisConfig {
-            builder_stages: get_builder_stages(),
-            builder_tag: if cli.builder_tag != "trellis-builder" {
-                cli.builder_tag
-            } else {
-                get_builder_tag().unwrap_or_else(|| "trellis-builder".to_string())
-            },
-            podman_build_cache: cli.podman_build_cache
-                .or(get_podman_build_cache())
-                .unwrap_or(false),
-            pacman_cache: cli.pacman_cache.or(get_pacman_cache()),
-            aur_cache: cli.aur_cache.or(get_aur_cache()),
+            builder_stages,
+            builder_tag,
+            podman_build_cache,
+            pacman_cache,
+            aur_cache,
             src_dir,
-            rootfs_stages: get_rootfs_stages(),
-            extra_contexts: get_extra_contexts(),
-            extra_mounts: get_extra_mounts(),
-            rootfs_tag: if cli.rootfs_tag != "trellis-rootfs" {
-                cli.rootfs_tag
-            } else {
-                get_rootfs_tag().unwrap_or_else(|| "trellis-rootfs".to_string())
-            },
-            hooks_dir: if hooks_dir.exists() {
-                Some(hooks_dir)
-            } else {
-                None
-            },
+            rootfs_stages,
+            extra_contexts,
+            extra_mounts,
+            rootfs_tag,
+            hooks_dir: hooks_dir.exists().then_some(hooks_dir),
         })
     }
 }

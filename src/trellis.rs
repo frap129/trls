@@ -1,10 +1,11 @@
-use anyhow::{anyhow, Context, Result};
-use std::env;
-use std::fs;
-use std::process::Command;
+use std::{env, fs, process::Command};
 
-use crate::cli::{Cli, Commands};
-use crate::config::TrellisConfig;
+use anyhow::{anyhow, Context, Result};
+
+use crate::{
+    cli::{Cli, Commands},
+    config::TrellisConfig,
+};
 
 
 pub struct TrellisApp {
@@ -43,11 +44,11 @@ impl<'a> Trellis<'a> {
     }
 
     fn msg(&self, message: &str) {
-        println!("====> {}", message);
+        println!("====> {message}");
     }
 
     fn warning(&self, message: &str) {
-        eprintln!("====> WARNING: {}", message);
+        eprintln!("====> WARNING: {message}");
     }
 
     fn multistage_container_build(
@@ -60,39 +61,37 @@ impl<'a> Trellis<'a> {
         let mut last_stage = String::new();
 
         for (i, build_stage) in build_stages.iter().enumerate() {
-            let (group, stage) = if build_stage.contains(':') {
-                let parts: Vec<&str> = build_stage.split(':').collect();
-                (parts[0].to_string(), parts[1].to_string())
-            } else {
-                (build_stage.clone(), build_stage.clone())
-            };
+            let (group, stage) = Self::parse_stage_name(build_stage);
 
             let tag = if i == build_stages.len() - 1 {
                 final_tag.to_string()
             } else if stage != group {
-                format!("trellis-{}-{}-{}", tmp_name, group, stage)
+                format!("trellis-{tmp_name}-{group}-{stage}")
             } else {
-                format!("trellis-{}-{}", tmp_name, stage)
+                format!("trellis-{tmp_name}-{stage}")
             };
 
             let containerfile_path = self.find_containerfile(&group)?;
 
-            let args = vec![
-                "--net=host".to_string(),
-                "--cap-add".to_string(),
-                "sys_admin".to_string(),
-                "--cap-add".to_string(),
-                "mknod".to_string(),
-                "--squash".to_string(),
-                "-f".to_string(),
-                containerfile_path,
-                "--build-arg".to_string(),
-                format!("BASE_IMAGE=localhost/{}", last_stage),
-                "--target".to_string(),
-                stage,
-                "-t".to_string(),
-                tag.clone(),
-            ];
+            let args = [
+                "--net=host",
+                "--cap-add",
+                "sys_admin",
+                "--cap-add",
+                "mknod",
+                "--squash",
+                "-f",
+                &containerfile_path,
+                "--build-arg",
+                &format!("BASE_IMAGE=localhost/{last_stage}"),
+                "--target",
+                &stage,
+                "-t",
+                &tag,
+            ]
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
 
             build_cmd_fn(self, &args)?;
             last_stage = tag;
@@ -101,8 +100,16 @@ impl<'a> Trellis<'a> {
         Ok(())
     }
 
+    fn parse_stage_name(build_stage: &str) -> (String, String) {
+        if let Some((group, stage)) = build_stage.split_once(':') {
+            (group.to_string(), stage.to_string())
+        } else {
+            (build_stage.to_string(), build_stage.to_string())
+        }
+    }
+
     fn find_containerfile(&self, group: &str) -> Result<String> {
-        let filename = format!("Containerfile.{}", group);
+        let filename = format!("Containerfile.{group}");
         
         // First try: look in subdirectory named after the group
         let subdir_path = self.config.src_dir.join(group).join(&filename);
@@ -116,11 +123,11 @@ impl<'a> Trellis<'a> {
             return Ok(root_path.to_string_lossy().to_string());
         }
         
-        Err(anyhow!("Containerfile not found: {} (searched in {}/{} and {})", 
-                   filename, 
-                   self.config.src_dir.display(), 
-                   group,
-                   self.config.src_dir.display()))
+        Err(anyhow!(
+            "Containerfile not found: {filename} (searched in {}/{group} and {})",
+            self.config.src_dir.display(),
+            self.config.src_dir.display()
+        ))
     }
 
     fn builder_podman_cmd(&self, args: &[String]) -> Result<()> {
@@ -134,14 +141,15 @@ impl<'a> Trellis<'a> {
 
         cmd.args(args);
 
-        let status = cmd.status()
+        let status = cmd
+            .status()
             .context("Failed to execute podman build command")?;
 
-        if !status.success() {
-            return Err(anyhow!("Podman build failed"));
+        if status.success() {
+            Ok(())
+        } else {
+            Err(anyhow!("Podman build failed"))
         }
-
-        Ok(())
     }
 
     fn rootfs_podman_cmd(&self, args: &[String]) -> Result<()> {
@@ -158,44 +166,52 @@ impl<'a> Trellis<'a> {
             cmd.arg("--build-context").arg(context);
         }
 
-        // Add pacman cache
-        if let Some(pacman_cache) = &self.config.pacman_cache {
-            if fs::create_dir_all(pacman_cache).is_err() {
-                self.warning(&format!("Failed to create pacman cache directory: {:?}", pacman_cache));
-            } else {
-                cmd.arg("-v").arg(format!("{}:/var/cache/pacman/pkg", pacman_cache.display()));
-            }
-        }
-
-        // Add AUR cache
-        if let Some(aur_cache) = &self.config.aur_cache {
-            if fs::create_dir_all(aur_cache).is_err() {
-                self.warning(&format!("Failed to create AUR cache directory: {:?}", aur_cache));
-            } else {
-                cmd.arg("-v").arg(format!("{}:/var/cache/trellis/aur", aur_cache.display()));
-            }
-        }
+        // Add cache directories
+        self.add_cache_mount(&mut cmd, &self.config.pacman_cache, "pacman", "/var/cache/pacman/pkg")?;
+        self.add_cache_mount(&mut cmd, &self.config.aur_cache, "AUR", "/var/cache/trellis/aur")?;
 
         // Add hooks directory
         if let Some(hooks_dir) = &self.config.hooks_dir {
-            cmd.arg("-v").arg(format!("{}:{}", hooks_dir.display(), hooks_dir.display()));
-            cmd.arg("--build-arg").arg(format!("HOOKS_DIR={}", hooks_dir.display()));
+            let hooks_path = hooks_dir.display().to_string();
+            cmd.arg("-v").arg(format!("{hooks_path}:{hooks_path}"));
+            cmd.arg("--build-arg").arg(format!("HOOKS_DIR={hooks_path}"));
         }
 
         // Add extra mounts
         for mount in &self.config.extra_mounts {
-            cmd.arg("-v").arg(format!("{}:{}", mount.display(), mount.display()));
+            let mount_path = mount.display().to_string();
+            cmd.arg("-v").arg(format!("{mount_path}:{mount_path}"));
         }
 
         cmd.args(args);
 
-        let status = cmd.status()
+        let status = cmd
+            .status()
             .context("Failed to execute podman build command")?;
 
-        if !status.success() {
-            return Err(anyhow!("Podman build failed"));
+        if status.success() {
+            Ok(())
+        } else {
+            Err(anyhow!("Podman build failed"))
         }
+    }
 
+    fn add_cache_mount(
+        &self,
+        cmd: &mut Command,
+        cache_path: &Option<std::path::PathBuf>,
+        cache_name: &str,
+        container_path: &str,
+    ) -> Result<()> {
+        if let Some(cache_dir) = cache_path {
+            if let Err(e) = fs::create_dir_all(cache_dir) {
+                self.warning(&format!(
+                    "Failed to create {cache_name} cache directory: {cache_dir:?} - {e}"
+                ));
+            } else {
+                cmd.arg("-v").arg(format!("{}:{container_path}", cache_dir.display()));
+            }
+        }
         Ok(())
     }
 
@@ -233,7 +249,7 @@ impl<'a> Trellis<'a> {
 
     pub fn run_rootfs_container(&self, args: &[String]) -> Result<()> {
         let mut cmd = Command::new("podman");
-        cmd.args(&[
+        cmd.args([
             "run",
             "--net=host",
             "--cap-add",
@@ -244,28 +260,29 @@ impl<'a> Trellis<'a> {
         ]);
         cmd.args(args);
 
-        let status = cmd.status()
+        let status = cmd
+            .status()
             .context("Failed to execute podman run command")?;
 
-        if !status.success() {
-            return Err(anyhow!("Podman run failed"));
+        if status.success() {
+            Ok(())
+        } else {
+            Err(anyhow!("Podman run failed"))
         }
-
-        Ok(())
     }
 
     pub fn clean(&self) -> Result<()> {
         let status = Command::new("podman")
-            .args(&["system", "prune"])
+            .args(["system", "prune"])
             .status()
             .context("Failed to execute podman system prune")?;
 
-        if !status.success() {
-            return Err(anyhow!("Podman system prune failed"));
+        if status.success() {
+            self.msg("System cleaned successfully");
+            Ok(())
+        } else {
+            Err(anyhow!("Podman system prune failed"))
         }
-
-        self.msg("System cleaned successfully");
-        Ok(())
     }
 
     pub fn update(&self) -> Result<()> {
