@@ -1,4 +1,4 @@
-use std::{env, fs, process::Command};
+use std::{env, fs, path::Path, process::Command};
 
 use anyhow::{anyhow, Context, Result};
 
@@ -116,24 +116,44 @@ impl<'a> Trellis<'a> {
         }
     }
 
+    fn find_containerfile_recursive(&self, dir: &Path, filename: &str, searched_paths: &mut Vec<String>) -> Option<String> {
+        // Check if the file exists in the current directory
+        let file_path = dir.join(filename);
+        if file_path.exists() {
+            return Some(file_path.to_string_lossy().to_string());
+        }
+        
+        // Track this directory as searched
+        searched_paths.push(dir.display().to_string());
+        
+        // Recursively search subdirectories
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                if let Ok(metadata) = entry.metadata() {
+                    if metadata.is_dir() {
+                        let subdir = entry.path();
+                        if let Some(found) = self.find_containerfile_recursive(&subdir, filename, searched_paths) {
+                            return Some(found);
+                        }
+                    }
+                }
+            }
+        }
+        
+        None
+    }
+
     pub fn find_containerfile(&self, group: &str) -> Result<String> {
         let filename = format!("Containerfile.{group}");
         
-        // First try: look in subdirectory named after the group
-        let subdir_path = self.config.src_dir.join(group).join(&filename);
-        if subdir_path.exists() {
-            return Ok(subdir_path.to_string_lossy().to_string());
-        }
-        
-        // Second try: look in root src directory
-        let root_path = self.config.src_dir.join(&filename);
-        if root_path.exists() {
-            return Ok(root_path.to_string_lossy().to_string());
+        // Recursive search through all subdirectories starting from src/
+        let mut searched_paths = Vec::new();
+        if let Some(found) = self.find_containerfile_recursive(&self.config.src_dir, &filename, &mut searched_paths) {
+            return Ok(found);
         }
         
         Err(anyhow!(
-            "Containerfile not found: {filename} (searched in {}/{group} and {})",
-            self.config.src_dir.display(),
+            "Containerfile not found: {filename} (searched recursively in {} and all subdirectories)",
             self.config.src_dir.display()
         ))
     }

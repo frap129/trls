@@ -141,14 +141,16 @@ src/
 
 #### Containerfile Discovery
 
-Trellis searches for containerfiles in this order:
+Trellis recursively searches for containerfiles throughout the entire source directory tree, starting from the configured source directory (default: `src/`).
 
-1. **Subdirectory first**: `src/{group}/Containerfile.{group}`
-2. **Root directory fallback**: `src/Containerfile.{group}`
+When building a stage named `{group}`, trellis will search for `Containerfile.{group}` in:
+- The root source directory: `src/Containerfile.{group}`
+- Any subdirectory: `src/{path}/Containerfile.{group}`
 
-For example, when building stage `gpu`, trellis will:
-1. Look for `src/gpu/Containerfile.gpu` (preferred)
-2. Fall back to `src/Containerfile.gpu` if not found
+For example, when building stage `gpu`, trellis will find the containerfile whether it's located at:
+- `src/Containerfile.gpu` (flat structure)
+- `src/gpu/Containerfile.gpu` (nested structure)
+- `src/features/gpu/Containerfile.gpu` (deeply nested structure)
 
 #### Multi-stage Builds
 

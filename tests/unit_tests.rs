@@ -179,6 +179,26 @@ fn test_find_containerfile_prefers_subdir() {
 }
 
 #[test]
+fn test_find_containerfile_recursive_search() {
+    let temp_dir = TempDir::new().unwrap();
+    
+    // Create a deeply nested directory structure
+    let nested_dir = temp_dir.path().join("deeply").join("nested").join("subdir");
+    fs::create_dir_all(&nested_dir).unwrap();
+    
+    // Place a Containerfile in the nested directory
+    let containerfile_path = nested_dir.join("Containerfile.root");
+    fs::write(&containerfile_path, "FROM alpine:recursive").unwrap();
+    
+    let config = create_test_config(&temp_dir);
+    let trellis = Trellis::new(&config);
+    
+    // The recursive search should find the deeply nested Containerfile
+    let result = trellis.find_containerfile("root").unwrap();
+    assert_eq!(result, containerfile_path.to_string_lossy());
+}
+
+#[test]
 fn test_trellis_app_creation() {
     let cli = Cli {
         command: Commands::Build,
