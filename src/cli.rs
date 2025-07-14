@@ -17,6 +17,10 @@ pub struct Cli {
     #[arg(long)]
     pub podman_build_cache: Option<bool>,
 
+    /// Automatically clean intermediate images after successful builds
+    #[arg(long)]
+    pub auto_clean: bool,
+
     /// Path to a persistent pacman package cache
     #[arg(long)]
     pub pacman_cache: Option<PathBuf>,

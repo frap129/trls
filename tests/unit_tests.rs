@@ -12,6 +12,7 @@ fn create_test_cli() -> Cli {
         command: Commands::Build,
         builder_tag: "test-builder".to_string(),
         podman_build_cache: None,
+        auto_clean: false,
         pacman_cache: None,
         aur_cache: None,
         src_dir: None,
@@ -28,6 +29,7 @@ fn create_test_config(temp_dir: &TempDir) -> TrellisConfig {
         builder_stages: vec!["base".to_string()],
         builder_tag: "test-builder".to_string(),
         podman_build_cache: false,
+        auto_clean: false,
         pacman_cache: None,
         aur_cache: None,
         src_dir: temp_dir.path().to_path_buf(),
@@ -182,6 +184,7 @@ fn test_trellis_app_creation() {
         command: Commands::Build,
         builder_tag: "test-builder".to_string(),
         podman_build_cache: None,
+        auto_clean: false,
         pacman_cache: None,
         aur_cache: None,
         src_dir: None,
@@ -194,6 +197,30 @@ fn test_trellis_app_creation() {
     
     let app = TrellisApp::new(cli);
     assert!(app.is_ok());
+}
+
+#[test]
+fn test_auto_clean_config() {
+    let temp_dir = TempDir::new().unwrap();
+    
+    // Test CLI override of auto-clean
+    let cli = Cli {
+        command: Commands::Build,
+        builder_tag: "test-builder".to_string(),
+        podman_build_cache: None,
+        auto_clean: true,
+        pacman_cache: None,
+        aur_cache: None,
+        src_dir: Some(temp_dir.path().to_path_buf()),
+        extra_contexts: vec![],
+        extra_mounts: vec![],
+        rootfs_stages: vec!["base".to_string()],
+        rootfs_tag: "test-rootfs".to_string(),
+        builder_stages: vec![],
+    };
+    
+    let config = TrellisConfig::new(cli).unwrap();
+    assert!(config.auto_clean);
 }
 
 #[test]

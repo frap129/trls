@@ -34,6 +34,14 @@ impl TrellisApp {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+enum CleanMode {
+    /// Remove all trls-generated images
+    Full,
+    /// Remove only intermediate images, keep final builder/rootfs tags
+    Auto,
+}
+
 pub struct Trellis<'a> {
     config: &'a TrellisConfig,
 }
@@ -228,6 +236,10 @@ impl<'a> Trellis<'a> {
         )?;
 
         self.msg("Builder container built successfully");
+        
+        // Auto-clean intermediate images if enabled
+        self.auto_clean()?;
+        
         Ok(())
     }
 
@@ -244,6 +256,10 @@ impl<'a> Trellis<'a> {
         )?;
 
         self.msg("Rootfs container built successfully");
+        
+        // Auto-clean intermediate images if enabled
+        self.auto_clean()?;
+        
         Ok(())
     }
 
@@ -271,19 +287,23 @@ impl<'a> Trellis<'a> {
         }
     }
 
-    fn is_trellis_image(&self, image: &str) -> bool {
-        // Pre-compute expected image names to avoid repeated allocations
-        let expected_builder = format!("localhost/{}:latest", self.config.builder_tag);
-        let expected_rootfs = format!("localhost/{}:latest", self.config.rootfs_tag);
+    fn is_trellis_image(&self, image: &str, mode: CleanMode, expected_builder: &str, expected_rootfs: &str) -> bool {
+        let is_builder_image = image.starts_with("localhost/trellis-builder");
+        let is_stage_image = image.starts_with("localhost/trellis-stage");
+        let is_final_builder = image == expected_builder;
+        let is_final_rootfs = image == expected_rootfs;
         
-        image == expected_builder ||
-        image == expected_rootfs ||
-        image.starts_with("localhost/trellis-builder") ||
-        image.starts_with("localhost/trellis-stage")
+        match mode {
+            CleanMode::Full => is_builder_image || is_stage_image || is_final_builder || is_final_rootfs,
+            CleanMode::Auto => (is_builder_image && !is_final_builder) || (is_stage_image && !is_final_rootfs),
+        }
     }
 
-    pub fn clean(&self) -> Result<()> {
-        self.msg("Cleaning trls-generated images...");
+    fn clean_images(&self, mode: CleanMode) -> Result<u32> {
+        let mode_desc = match mode {
+            CleanMode::Full => "all trls-generated",
+            CleanMode::Auto => "intermediate trls-generated",
+        };
         
         let output = Command::new("podman")
             .args(["images", "--format", "{{.Repository}}:{{.Tag}}"])
@@ -294,19 +314,22 @@ impl<'a> Trellis<'a> {
             return Err(anyhow!("Failed to list images"));
         }
         
+        // Pre-compute expected image names once
+        let expected_builder = format!("localhost/{}:latest", self.config.builder_tag);
+        let expected_rootfs = format!("localhost/{}:latest", self.config.rootfs_tag);
+        
         let image_list = String::from_utf8_lossy(&output.stdout);
         let images_to_remove: Vec<&str> = image_list
             .lines()
             .map(str::trim)
-            .filter(|line| !line.is_empty() && self.is_trellis_image(line))
+            .filter(|line| !line.is_empty() && self.is_trellis_image(line, mode, &expected_builder, &expected_rootfs))
             .collect();
         
         if images_to_remove.is_empty() {
-            self.msg("No trls-generated images found to clean");
-            return Ok(());
+            return Ok(0);
         }
         
-        self.msg(&format!("Found {} trls-generated images to remove", images_to_remove.len()));
+        self.msg(&format!("Found {} {} images to remove", images_to_remove.len(), mode_desc));
         
         let mut removed_count = 0;
         for image in images_to_remove {
@@ -323,7 +346,34 @@ impl<'a> Trellis<'a> {
             }
         }
         
-        self.msg(&format!("Cleanup completed - removed {} images", removed_count));
+        Ok(removed_count)
+    }
+
+    pub fn clean(&self) -> Result<()> {
+        self.msg("Cleaning trls-generated images...");
+        
+        let removed_count = self.clean_images(CleanMode::Full)?;
+        
+        if removed_count == 0 {
+            self.msg("No trls-generated images found to clean");
+        } else {
+            self.msg(&format!("Cleanup completed - removed {} images", removed_count));
+        }
+        
+        Ok(())
+    }
+
+    pub fn auto_clean(&self) -> Result<()> {
+        if !self.config.auto_clean {
+            return Ok(());
+        }
+        
+        let removed_count = self.clean_images(CleanMode::Auto)?;
+        
+        if removed_count > 0 {
+            self.msg(&format!("Auto-cleanup removed {} intermediate images", removed_count));
+        }
+        
         Ok(())
     }
 

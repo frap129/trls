@@ -7,6 +7,7 @@ rootfs_stages = ["base", "system"]
 builder_tag = "trellis-builder"
 rootfs_tag = "trellis-rootfs"
 podman_build_cache = false
+auto_clean = true
 extra_contexts = []
 extra_mounts = []
 

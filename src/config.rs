@@ -18,6 +18,7 @@ pub struct BuildConfig {
     pub builder_tag: Option<String>,
     pub rootfs_tag: Option<String>,
     pub podman_build_cache: Option<bool>,
+    pub auto_clean: Option<bool>,
     pub extra_contexts: Option<Vec<String>>,
     pub extra_mounts: Option<Vec<PathBuf>>,
 }
@@ -39,6 +40,7 @@ impl Default for Config {
                 builder_tag: Some("trellis-builder".to_string()),
                 rootfs_tag: Some("trellis-rootfs".to_string()),
                 podman_build_cache: Some(false),
+                auto_clean: Some(false),
                 extra_contexts: None,
                 extra_mounts: None,
             }),
@@ -56,6 +58,7 @@ pub struct TrellisConfig {
     pub builder_stages: Vec<String>,
     pub builder_tag: String,
     pub podman_build_cache: bool,
+    pub auto_clean: bool,
     pub pacman_cache: Option<PathBuf>,
     pub aur_cache: Option<PathBuf>,
     pub src_dir: PathBuf,
@@ -180,10 +183,17 @@ impl TrellisConfig {
                 .and_then(|e| e.aur_cache.clone())
         });
 
+        let auto_clean = cli.auto_clean || file_config
+            .build
+            .as_ref()
+            .and_then(|b| b.auto_clean)
+            .unwrap_or(false);
+
         Ok(TrellisConfig {
             builder_stages,
             builder_tag,
             podman_build_cache,
+            auto_clean,
             pacman_cache,
             aur_cache,
             src_dir,
