@@ -1,6 +1,8 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+use crate::trellis::constants::containers;
+
 #[derive(Parser)]
 #[command(name = "trellis")]
 #[command(about = "A container build system for multi-stage builds")]
@@ -10,7 +12,7 @@ pub struct Cli {
     pub command: Commands,
 
     /// Name of the tag to use for the pacstrap container
-    #[arg(long, default_value = "trellis-builder")]
+    #[arg(long, default_value = containers::DEFAULT_BUILDER_TAG)]
     pub builder_tag: String,
 
     /// Enable/Disable podman build cache
@@ -46,7 +48,7 @@ pub struct Cli {
     pub rootfs_stages: Vec<String>,
 
     /// Name of the tag to use for the rootfs container
-    #[arg(long, default_value = "trellis-rootfs")]
+    #[arg(long, default_value = containers::DEFAULT_ROOTFS_TAG)]
     pub rootfs_tag: String,
 
     /// A comma delimited list of the builder image stages to build

@@ -4,7 +4,7 @@ use tempfile::TempDir;
 use trellis::{
     cli::{Cli, Commands},
     config::{Config, TrellisConfig},
-    trellis::{Trellis, TrellisApp},
+    TrellisApp, ContainerfileDiscovery,
 };
 
 fn create_test_cli() -> Cli {
@@ -117,7 +117,7 @@ hooks_dir = "/custom/hooks"
     assert_eq!(build.podman_build_cache, Some(true));
 }
 
-// Trellis tests
+// Discovery tests
 #[test]
 fn test_find_containerfile_in_subdir() {
     let temp_dir = TempDir::new().unwrap();
@@ -128,9 +128,9 @@ fn test_find_containerfile_in_subdir() {
     fs::write(&containerfile_path, "FROM alpine").unwrap();
     
     let config = create_test_config(&temp_dir);
-    let trellis = Trellis::new(&config);
+    let discovery = ContainerfileDiscovery::new(&config);
     
-    let result = trellis.find_containerfile("base").unwrap();
+    let result = discovery.find_containerfile("base").unwrap();
     assert_eq!(result, containerfile_path.to_string_lossy());
 }
 
@@ -141,9 +141,9 @@ fn test_find_containerfile_in_root() {
     fs::write(&containerfile_path, "FROM alpine").unwrap();
     
     let config = create_test_config(&temp_dir);
-    let trellis = Trellis::new(&config);
+    let discovery = ContainerfileDiscovery::new(&config);
     
-    let result = trellis.find_containerfile("base").unwrap();
+    let result = discovery.find_containerfile("base").unwrap();
     assert_eq!(result, containerfile_path.to_string_lossy());
 }
 
@@ -151,9 +151,9 @@ fn test_find_containerfile_in_root() {
 fn test_find_containerfile_not_found() {
     let temp_dir = TempDir::new().unwrap();
     let config = create_test_config(&temp_dir);
-    let trellis = Trellis::new(&config);
+    let discovery = ContainerfileDiscovery::new(&config);
     
-    let result = trellis.find_containerfile("nonexistent");
+    let result = discovery.find_containerfile("nonexistent");
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("Containerfile not found"));
 }
@@ -172,9 +172,9 @@ fn test_find_containerfile_prefers_subdir() {
     fs::write(&subdir_containerfile, "FROM alpine:subdir").unwrap();
     
     let config = create_test_config(&temp_dir);
-    let trellis = Trellis::new(&config);
+    let discovery = ContainerfileDiscovery::new(&config);
     
-    let result = trellis.find_containerfile("base").unwrap();
+    let result = discovery.find_containerfile("base").unwrap();
     assert_eq!(result, subdir_containerfile.to_string_lossy());
 }
 
@@ -191,10 +191,10 @@ fn test_find_containerfile_recursive_search() {
     fs::write(&containerfile_path, "FROM alpine:recursive").unwrap();
     
     let config = create_test_config(&temp_dir);
-    let trellis = Trellis::new(&config);
+    let discovery = ContainerfileDiscovery::new(&config);
     
     // The recursive search should find the deeply nested Containerfile
-    let result = trellis.find_containerfile("root").unwrap();
+    let result = discovery.find_containerfile("root").unwrap();
     assert_eq!(result, containerfile_path.to_string_lossy());
 }
 
@@ -249,7 +249,7 @@ fn test_build_rootfs_container_no_stages() {
     let mut config = create_test_config(&temp_dir);
     config.rootfs_stages = vec![];
     
-    let trellis = Trellis::new(&config);
+    let trellis = trellis::Trellis::new(&config);
     let result = trellis.build_rootfs_container();
     
     assert!(result.is_err());
@@ -262,7 +262,7 @@ fn test_build_builder_container_no_stages() {
     let mut config = create_test_config(&temp_dir);
     config.builder_stages = vec![];
     
-    let trellis = Trellis::new(&config);
+    let trellis = trellis::Trellis::new(&config);
     let result = trellis.build_builder_container();
     
     assert!(result.is_err());
