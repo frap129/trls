@@ -77,7 +77,7 @@ impl TrellisConfig {
             Config::default()
         };
 
-        let script_dir = env::current_exe()
+        let _script_dir = env::current_exe()
             .context("Failed to get current executable path")?
             .parent()
             .unwrap()
@@ -156,7 +156,7 @@ impl TrellisConfig {
 
         let src_dir = cli.src_dir
             .or(get_src_dir())
-            .unwrap_or_else(|| script_dir.join("src"));
+            .unwrap_or_else(|| PathBuf::from("/var/lib/trellis/src"));
 
         let hooks_dir = PathBuf::from("/etc/trellis/hooks.d");
 
