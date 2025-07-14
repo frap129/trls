@@ -271,18 +271,60 @@ impl<'a> Trellis<'a> {
         }
     }
 
-    pub fn clean(&self) -> Result<()> {
-        let status = Command::new("podman")
-            .args(["system", "prune"])
-            .status()
-            .context("Failed to execute podman system prune")?;
+    fn is_trellis_image(&self, image: &str) -> bool {
+        // Pre-compute expected image names to avoid repeated allocations
+        let expected_builder = format!("localhost/{}:latest", self.config.builder_tag);
+        let expected_rootfs = format!("localhost/{}:latest", self.config.rootfs_tag);
+        
+        image == expected_builder ||
+        image == expected_rootfs ||
+        image.starts_with("localhost/trellis-builder") ||
+        image.starts_with("localhost/trellis-stage")
+    }
 
-        if status.success() {
-            self.msg("System cleaned successfully");
-            Ok(())
-        } else {
-            Err(anyhow!("Podman system prune failed"))
+    pub fn clean(&self) -> Result<()> {
+        self.msg("Cleaning trls-generated images...");
+        
+        let output = Command::new("podman")
+            .args(["images", "--format", "{{.Repository}}:{{.Tag}}"])
+            .output()
+            .context("Failed to list podman images")?;
+        
+        if !output.status.success() {
+            return Err(anyhow!("Failed to list images"));
         }
+        
+        let image_list = String::from_utf8_lossy(&output.stdout);
+        let images_to_remove: Vec<&str> = image_list
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && self.is_trellis_image(line))
+            .collect();
+        
+        if images_to_remove.is_empty() {
+            self.msg("No trls-generated images found to clean");
+            return Ok(());
+        }
+        
+        self.msg(&format!("Found {} trls-generated images to remove", images_to_remove.len()));
+        
+        let mut removed_count = 0;
+        for image in images_to_remove {
+            let status = Command::new("podman")
+                .args(["rmi", "-f", image])
+                .status()
+                .context("Failed to remove image")?;
+                
+            if status.success() {
+                self.msg(&format!("Removed image: {}", image));
+                removed_count += 1;
+            } else {
+                self.warning(&format!("Failed to remove image: {}", image));
+            }
+        }
+        
+        self.msg(&format!("Cleanup completed - removed {} images", removed_count));
+        Ok(())
     }
 
     pub fn update(&self) -> Result<()> {

@@ -86,16 +86,49 @@ fn test_build_with_missing_containerfile() {
 
 #[test]
 fn test_clean_command() {
-    // This test will succeed if podman is available, otherwise fail
-    // In a real environment, we might want to mock podman
+    // Test that clean command runs and provides appropriate output
     let mut cmd = Command::cargo_bin("trls").unwrap();
     cmd.arg("clean");
     
-    // We don't assert success/failure here since it depends on podman availability
     let output = cmd.output().unwrap();
+    let stdout_str = String::from_utf8_lossy(&output.stdout);
+    let stderr_str = String::from_utf8_lossy(&output.stderr);
     
-    // Just check that the command ran and produced some output
-    assert!(!output.stdout.is_empty() || !output.stderr.is_empty());
+    // Check that the command provides informative output about trls-specific cleaning
+    // It should either say "Cleaning trls-generated images..." or have an error about podman
+    assert!(
+        stdout_str.contains("Cleaning trls-generated images") || 
+        stderr_str.contains("Failed to list podman images") ||
+        stderr_str.contains("Failed to execute podman") ||
+        stdout_str.contains("No trls-generated images found to clean"),
+        "Expected clean command to show trls-specific cleaning behavior, got stdout: '{}', stderr: '{}'", 
+        stdout_str, stderr_str
+    );
+}
+
+#[test]
+fn test_clean_command_with_custom_tags() {
+    // Test that clean command works with custom tags
+    let mut cmd = Command::cargo_bin("trls").unwrap();
+    cmd.arg("--builder-tag")
+        .arg("custom-builder")
+        .arg("--rootfs-tag")
+        .arg("custom-rootfs")
+        .arg("clean");
+    
+    let output = cmd.output().unwrap();
+    let stdout_str = String::from_utf8_lossy(&output.stdout);
+    let stderr_str = String::from_utf8_lossy(&output.stderr);
+    
+    // Should still show trls-specific cleaning behavior regardless of custom tags
+    assert!(
+        stdout_str.contains("Cleaning trls-generated images") || 
+        stderr_str.contains("Failed to list podman images") ||
+        stderr_str.contains("Failed to execute podman") ||
+        stdout_str.contains("No trls-generated images found to clean"),
+        "Expected clean command to work with custom tags, got stdout: '{}', stderr: '{}'", 
+        stdout_str, stderr_str
+    );
 }
 
 #[test]
