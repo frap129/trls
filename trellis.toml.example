@@ -1,0 +1,16 @@
+# Minimal Trellis Configuration
+# Copy to /etc/trellis/trellis.toml and customize as needed
+
+[build]
+builder_stages = ["base"]
+rootfs_stages = ["base", "system"]
+builder_tag = "trellis-builder"
+rootfs_tag = "trellis-rootfs"
+podman_build_cache = false
+extra_contexts = []
+extra_mounts = []
+
+[environment]
+pacman_cache = "/var/cache/pacman/pkg"
+aur_cache = "/var/cache/trellis/aur"
+src_dir = "/var/lib/trellis/src"
