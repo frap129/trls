@@ -28,6 +28,7 @@ pub struct EnvironmentConfig {
     pub pacman_cache: Option<PathBuf>,
     pub aur_cache: Option<PathBuf>,
     pub src_dir: Option<PathBuf>,
+    pub hooks_dir: Option<PathBuf>,
 }
 
 impl Default for Config {
@@ -46,6 +47,7 @@ impl Default for Config {
                 pacman_cache: Some(PathBuf::from("/var/cache/pacman/pkg")),
                 aur_cache: Some(PathBuf::from("/var/cache/trellis/aur")),
                 src_dir: None,
+                hooks_dir: Some(PathBuf::from("/etc/trellis/hooks.d")),
             }),
         }
     }
@@ -134,6 +136,11 @@ impl TrellisConfig {
                 .and_then(|e| e.src_dir.clone())
         };
 
+        let get_hooks_dir = || {
+            file_config.environment.as_ref()
+                .and_then(|e| e.hooks_dir.clone())
+        };
+
         let get_extra_contexts = || {
             if !cli.extra_contexts.is_empty() {
                 cli.extra_contexts.clone()
@@ -158,7 +165,8 @@ impl TrellisConfig {
             .or(get_src_dir())
             .unwrap_or_else(|| PathBuf::from("/var/lib/trellis/src"));
 
-        let hooks_dir = PathBuf::from("/etc/trellis/hooks.d");
+        let hooks_dir = get_hooks_dir()
+            .unwrap_or_else(|| PathBuf::from("/etc/trellis/hooks.d"));
 
         Ok(TrellisConfig {
             builder_stages: get_builder_stages(),
@@ -271,6 +279,7 @@ podman_build_cache = true
 src_dir = "/custom/src"
 pacman_cache = "/custom/pacman"
 aur_cache = "/custom/aur"
+hooks_dir = "/custom/hooks"
 "#;
         
         fs::write(&config_path, config_content).unwrap();
