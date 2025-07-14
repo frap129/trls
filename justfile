@@ -55,9 +55,12 @@ install: release-test
     sudo install -Dm644 trellis.toml.example /etc/trellis/trellis.toml
     sudo install -Dm755 hooks/50-dracut-setup.sh /etc/trellis/hooks.d/50-dracut-setup.sh
     sudo install -Dm755 hooks/50-sbctl-sign.sh /etc/trellis/hooks.d/50-sbctl-sign.sh
+    sudo mkdir -p /var/lib/trellis/src
+    sudo mkdir -p /var/cache/trellis/aur
     @echo "✅ Trellis installed to /usr/local/bin/trellis"
     @echo "✅ Config installed to /etc/trellis/trellis.toml"
     @echo "✅ Hooks installed to /etc/trellis/hooks.d/"
+    @echo "✅ Default directories created: /var/lib/trellis/src, /var/cache/trellis/aur"
 
 # Install to custom directory
 install-to PREFIX: release-test
@@ -65,9 +68,12 @@ install-to PREFIX: release-test
     sudo install -Dm644 trellis.toml.example {{PREFIX}}/etc/trellis/trellis.toml
     sudo install -Dm755 hooks/50-dracut-setup.sh {{PREFIX}}/etc/trellis/hooks.d/50-dracut-setup.sh
     sudo install -Dm755 hooks/50-sbctl-sign.sh {{PREFIX}}/etc/trellis/hooks.d/50-sbctl-sign.sh
+    sudo mkdir -p /var/lib/trellis/src
+    sudo mkdir -p /var/cache/trellis/aur
     @echo "✅ Trellis installed to {{PREFIX}}/bin/trellis"
     @echo "✅ Config installed to {{PREFIX}}/etc/trellis/trellis.toml"
     @echo "✅ Hooks installed to {{PREFIX}}/etc/trellis/hooks.d/"
+    @echo "✅ Default directories created: /var/lib/trellis/src, /var/cache/trellis/aur"
 
 # Uninstall from system
 uninstall:
@@ -77,6 +83,8 @@ uninstall:
     sudo rmdir /etc/trellis 2>/dev/null || true
     @echo "✅ Trellis uninstalled from /usr/local/bin/trellis"
     @echo "✅ Config and hooks removed from /etc/trellis/"
+    @echo "ℹ️  Cache and src directories preserved: /var/lib/trellis/src, /var/cache/trellis/aur"
+    @echo "ℹ️  Remove manually if desired: sudo rm -rf /var/lib/trellis /var/cache/trellis"
 
 # Development helpers
 # ===================
