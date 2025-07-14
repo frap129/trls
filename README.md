@@ -18,12 +18,12 @@ A Rust-based CLI utility for managing multi-stage bootc container builds with Po
 git clone <repository-url>
 cd trellis
 cargo build --release
-sudo cp target/release/trellis /usr/local/bin/
+sudo cp target/release/trls /usr/local/bin/
 ```
 
 ### Configuration
 
-Create a configuration file at `/etc/trellis/trellis.toml`, see trells.toml.example as a reference.
+Create a configuration file at `/etc/trellis/trellis.toml`, see trellis.toml.example as a reference.
 
 ## Usage
 
@@ -34,7 +34,7 @@ Create a configuration file at `/etc/trellis/trellis.toml`, see trells.toml.exam
 Build the pacstrap container used by other commands:
 
 ```bash
-trellis build-builder
+trls build-builder
 ```
 
 #### `build`
@@ -42,7 +42,7 @@ trellis build-builder
 Build all requested rootfs stages:
 
 ```bash
-trellis build
+trls build
 ```
 
 #### `run`
@@ -50,8 +50,8 @@ trellis build
 Run a command in the latest rootfs container:
 
 ```bash
-trellis run -- /bin/bash
-trellis run -- systemctl status
+trls run -- /bin/bash
+trls run -- systemctl status
 ```
 
 #### `clean`
@@ -59,7 +59,7 @@ trellis run -- systemctl status
 Remove unused container images:
 
 ```bash
-trellis clean
+trls clean
 ```
 
 #### `update`
@@ -67,7 +67,7 @@ trellis clean
 Shorthand to build rootfs and run bootc upgrade:
 
 ```bash
-trellis update
+trls update
 ```
 
 ### Command Line Options
@@ -76,25 +76,25 @@ All configuration options can be overridden via command line:
 
 ```bash
 # Override builder tag
-trellis --builder-tag my-builder build-builder
+trls --builder-tag my-builder build-builder
 
 # Override rootfs stages
-trellis --rootfs-stages base,custom,final build
+trls --rootfs-stages base,custom,final build
 
 # Override source directory
-trellis --src-dir /path/to/my/containerfiles build
+trls --src-dir /path/to/my/containerfiles build
 
 # Enable build cache
-trellis --podman-build-cache true build
+trls --podman-build-cache true build
 
 # Override pacman cache location
-trellis --pacman-cache /custom/cache/path build
+trls --pacman-cache /custom/cache/path build
 
 # Add extra mounts
-trellis --extra-mounts /host/path1,/host/path2 build
+trls --extra-mounts /host/path1,/host/path2 build
 
 # Add extra build contexts
-trellis --extra-contexts mycontext=/path/to/context build
+trls --extra-contexts mycontext=/path/to/context build
 ```
 
 ### Directory Structure
@@ -141,7 +141,7 @@ src/
 
 #### Containerfile Discovery
 
-Trellis recursively searches for containerfiles throughout the entire source directory tree, starting from the configured source directory (default: `src/`).
+Trellis recursively searches for containerfiles throughout the entire source directory tree, starting from the configured source directory (default: `/var/lib/trellis/src`).
 
 When building a stage named `{group}`, trellis will search for `Containerfile.{group}` in:
 - The root source directory: `src/Containerfile.{group}`
@@ -157,7 +157,7 @@ For example, when building stage `gpu`, trellis will find the containerfile whet
 For multi-stage Containerfiles, use the format `<group>:<stage>`:
 
 ```bash
-trellis --rootfs-stages "multi:stage1,multi:stage2,single" build
+trls --rootfs-stages "multi:stage1,multi:stage2,single" build
 ```
 
 This will look for:
@@ -190,26 +190,26 @@ Place executable scripts in `/etc/trellis/hooks.d/` to run custom logic during b
 
 ```bash
 # Build with default configuration
-trellis build
+trls build
 
 # Build with custom stages
-trellis --rootfs-stages base,custom,final build
+trls --rootfs-stages base,custom,final build
 ```
 
 ### Development Workflow
 
 ```bash
 # Build builder container
-trellis build-builder
+trls build-builder
 
 # Build development rootfs
-trellis --rootfs-stages base,devel build
+trls --rootfs-stages base,devel build
 
 # Test the build
-trellis run -- /bin/bash
+trls run -- /bin/bash
 
 # Clean up
-trellis clean
+trls clean
 ```
 
 ## Error Handling
