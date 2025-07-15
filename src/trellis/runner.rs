@@ -4,7 +4,7 @@ use anyhow::{anyhow, Context, Result};
 use crate::config::TrellisConfig;
 use super::{
     common::{TrellisMessaging, PodmanContext},
-    constants::containers,
+    constants::{containers, commands},
 };
 
 /// Container capabilities enum for type safety.
@@ -28,8 +28,8 @@ pub struct PodmanRunCommandBuilder {
 
 impl PodmanRunCommandBuilder {
     pub fn new() -> Self {
-        let mut cmd = Command::new("podman");
-        cmd.arg("run");
+        let mut cmd = Command::new(commands::PODMAN_CMD);
+        cmd.arg(commands::RUN_SUBCMD);
         Self { cmd }
     }
 

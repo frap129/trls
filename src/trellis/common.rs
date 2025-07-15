@@ -2,6 +2,18 @@
 
 use anyhow::Context;
 
+/// Message constants for consistent user output formatting
+mod messages {
+    /// Error message prefix
+    pub const ERROR_PREFIX: &str = "====> ERROR: ";
+    
+    /// Warning message prefix
+    pub const WARNING_PREFIX: &str = "====> WARNING: ";
+    
+    /// Info message prefix
+    pub const INFO_PREFIX: &str = "====> ";
+}
+
 /// Trait providing consistent messaging functionality across all trellis components.
 /// 
 /// This trait standardizes the output format for information, warning, and error messages,
@@ -9,17 +21,24 @@ use anyhow::Context;
 pub trait TrellisMessaging {
     /// Displays an informational message with the standard trellis prefix.
     fn msg(&self, message: &str) {
-        println!("====> {message}");
+        println!("{}{message}", messages::INFO_PREFIX);
     }
     
     /// Displays a warning message with the standard trellis warning prefix.
     fn warning(&self, message: &str) {
-        eprintln!("====> WARNING: {message}");
+        eprintln!("{}{message}", messages::WARNING_PREFIX);
     }
     
     /// Displays an error message with the standard trellis error prefix.
     fn error(&self, message: &str) {
-        eprintln!("====> ERROR: {message}");
+        eprintln!("{}{message}", messages::ERROR_PREFIX);
+    }
+    
+    /// Displays a prompt message without a newline for user input
+    fn prompt(&self, message: &str) {
+        eprint!("{}{message}", messages::INFO_PREFIX);
+        use std::io::{self, Write};
+        let _ = io::stderr().flush();
     }
 }
 

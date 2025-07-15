@@ -141,25 +141,25 @@ impl TrellisConfig {
 
         Ok(TrellisConfig {
             builder_stages: override_field!(vec, cli.builder_stages, || {
-                build_config.and_then(|b| b.builder_stages.clone())
+                Self::get_build_field(build_config, |b| &b.builder_stages)
             }),
             rootfs_stages: override_field!(vec, cli.rootfs_stages, || {
-                build_config.and_then(|b| b.rootfs_stages.clone())
+                Self::get_build_field(build_config, |b| &b.rootfs_stages)
             }),
             rootfs_base: override_field!(string, cli.rootfs_base, "scratch", || {
-                build_config.and_then(|b| b.rootfs_base.clone())
+                Self::get_build_field(build_config, |b| &b.rootfs_base)
             }),
             extra_contexts: override_field!(vec, cli.extra_contexts, || {
-                build_config.and_then(|b| b.extra_contexts.clone())
+                Self::get_build_field(build_config, |b| &b.extra_contexts)
             }),
             extra_mounts: override_field!(vec, cli.extra_mounts, || {
-                build_config.and_then(|b| b.extra_mounts.clone())
+                Self::get_build_field(build_config, |b| &b.extra_mounts)
             }),
             builder_tag: override_field!(string, cli.builder_tag, containers::DEFAULT_BUILDER_TAG, || {
-                build_config.and_then(|b| b.builder_tag.clone())
+                Self::get_build_field(build_config, |b| &b.builder_tag)
             }),
             rootfs_tag: override_field!(string, cli.rootfs_tag, containers::DEFAULT_ROOTFS_TAG, || {
-                build_config.and_then(|b| b.rootfs_tag.clone())
+                Self::get_build_field(build_config, |b| &b.rootfs_tag)
             }),
             podman_build_cache: override_field!(bool, cli.podman_build_cache, || {
                 build_config.and_then(|b| b.podman_build_cache)
@@ -167,10 +167,10 @@ impl TrellisConfig {
             auto_clean: cli.auto_clean
                 || build_config.and_then(|b| b.auto_clean).unwrap_or(false),
             pacman_cache: override_field!(option, cli.pacman_cache, || {
-                env_config.and_then(|e| e.pacman_cache.clone())
+                Self::get_env_field(env_config, |e| &e.pacman_cache)
             }),
             aur_cache: override_field!(option, cli.aur_cache, || {
-                env_config.and_then(|e| e.aur_cache.clone())
+                Self::get_env_field(env_config, |e| &e.aur_cache)
             }),
             src_dir: cli.src_dir
                 .or_else(|| env_config.and_then(|e| e.src_dir.clone()))
@@ -202,6 +202,22 @@ impl TrellisConfig {
             .and_then(|e| e.hooks_dir.clone())
             .unwrap_or_else(|| PathBuf::from(paths::DEFAULT_HOOKS_DIR));
         hooks_dir.exists().then_some(hooks_dir)
+    }
+
+    /// Helper function to consolidate build config field access patterns.
+    fn get_build_field<T: Clone>(
+        build_config: Option<&BuildConfig>,
+        field_getter: fn(&BuildConfig) -> &Option<T>
+    ) -> Option<T> {
+        build_config.and_then(|b| field_getter(b).clone())
+    }
+
+    /// Helper function to consolidate environment config field access patterns.
+    fn get_env_field<T: Clone>(
+        env_config: Option<&EnvironmentConfig>,
+        field_getter: fn(&EnvironmentConfig) -> &Option<T>
+    ) -> Option<T> {
+        env_config.and_then(|e| field_getter(e).clone())
     }
 
 }

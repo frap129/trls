@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
-use std::{io::{self, Write}, process};
+use std::{io::{self}, process};
 
 mod cli;
 mod config;
@@ -66,8 +66,7 @@ fn prompt_continue_as_non_root() -> Result<bool> {
     let messager = TrellisMessager::new();
     messager.warning("Running trls as non-root user");
     messager.warning("Container operations may fail or require additional permissions");
-    eprint!("====> Do you want to continue? [y/N]: ");
-    io::stderr().flush()?;
+    messager.prompt("Do you want to continue? [y/N]: ");
     
     let stdin = io::stdin();
     let mut handle = stdin.lock();

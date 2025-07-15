@@ -56,3 +56,42 @@ pub mod patterns {
     /// Maximum directory traversal depth for safety
     pub const MAX_SEARCH_DEPTH: usize = 10;
 }
+
+/// Podman command constants
+pub mod commands {
+    /// Main podman command
+    pub const PODMAN_CMD: &str = "podman";
+    
+    /// Build subcommand
+    pub const BUILD_SUBCMD: &str = "build";
+    
+    /// Remove image subcommand
+    pub const RMI_SUBCMD: &str = "rmi";
+    
+    /// Run container subcommand
+    pub const RUN_SUBCMD: &str = "run";
+    
+    /// Images subcommand
+    pub const IMAGES_SUBCMD: &str = "images";
+    
+    /// Version subcommand
+    pub const VERSION_SUBCMD: &str = "--version";
+}
+
+/// Common error messages
+pub mod errors {
+    /// No rootfs stages defined error
+    pub const NO_ROOTFS_STAGES: &str = "No rootfs stages defined";
+    
+    /// No builder stages defined error
+    pub const NO_BUILDER_STAGES: &str = "No builder stages defined";
+    
+    /// Missing required containerfiles error
+    pub const MISSING_CONTAINERFILES: &str = "Missing required containerfiles";
+    
+    /// Containerfile not found error
+    pub const CONTAINERFILE_NOT_FOUND: &str = "Containerfile not found";
+    
+    /// Podman not available error
+    pub const PODMAN_NOT_AVAILABLE: &str = "Podman is not available or not working correctly";
+}

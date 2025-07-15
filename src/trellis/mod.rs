@@ -22,7 +22,7 @@ pub mod discovery;
 pub mod common;
 pub mod constants;
 
-pub use builder::{ContainerBuilder, BuildType};
+pub use builder::{ContainerBuilder, validate_stages_not_empty};
 pub use cleaner::ImageCleaner;
 pub use runner::ContainerRunner;
 
@@ -74,9 +74,7 @@ impl<'a> Trellis<'a> {
     }
 
     pub fn build_builder_container(&self) -> Result<()> {
-        if self.config.builder_stages.is_empty() {
-            return Err(anyhow::anyhow!("No builder stages defined"));
-        }
+        validate_stages_not_empty(&self.config.builder_stages, "builder")?;
 
         self.builder.build_multistage_container(
             "builder",
@@ -94,9 +92,7 @@ impl<'a> Trellis<'a> {
     }
 
     pub fn build_rootfs_container(&self) -> Result<()> {
-        if self.config.rootfs_stages.is_empty() {
-            return Err(anyhow::anyhow!("No rootfs stages defined"));
-        }
+        validate_stages_not_empty(&self.config.rootfs_stages, "rootfs")?;
 
         self.builder.build_multistage_container(
             "stage",

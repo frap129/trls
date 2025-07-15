@@ -4,7 +4,7 @@ use anyhow::{anyhow, Context, Result};
 use crate::config::TrellisConfig;
 use super::{
     common::TrellisMessaging,
-    constants::containers,
+    constants::{containers, commands},
 };
 
 /// Mode for cleaning container images.
@@ -65,8 +65,8 @@ impl<'a> ImageCleaner<'a> {
             CleanMode::Auto => "intermediate trls-generated",
         };
         
-        let output = Command::new("podman")
-            .args(["images", "--format", "{{.Repository}}:{{.Tag}}"])
+        let output = Command::new(commands::PODMAN_CMD)
+            .args([commands::IMAGES_SUBCMD, "--format", "{{.Repository}}:{{.Tag}}"])
             .output()
             .context("Failed to list podman images")?;
         
@@ -135,8 +135,8 @@ impl<'a> ImageCleaner<'a> {
         }
 
         // Try to remove all images in a single command first
-        let mut cmd = Command::new("podman");
-        cmd.args(["rmi", "-f"]);
+        let mut cmd = Command::new(commands::PODMAN_CMD);
+        cmd.args([commands::RMI_SUBCMD, "-f"]);
         cmd.args(images);
         
         match cmd.output() {
@@ -172,8 +172,8 @@ impl<'a> ImageCleaner<'a> {
 
     /// Removes a single image with detailed error reporting.
     fn remove_single_image(&self, image: &str) -> Result<u32> {
-        let output = Command::new("podman")
-            .args(["rmi", "-f", image])
+        let output = Command::new(commands::PODMAN_CMD)
+            .args([commands::RMI_SUBCMD, "-f", image])
             .output()
             .context("Failed to remove image")?;
             

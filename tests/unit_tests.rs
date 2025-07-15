@@ -4,7 +4,8 @@ use tempfile::TempDir;
 use trellis::{
     cli::{Cli, Commands},
     config::{Config, TrellisConfig},
-    TrellisApp, ContainerfileDiscovery, ContainerBuilder, BuildType,
+    trellis::builder::BuildType,
+    TrellisApp, ContainerfileDiscovery, ContainerBuilder, 
 };
 
 fn create_test_cli() -> Cli {

@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use walkdir::WalkDir;
 
 use crate::config::TrellisConfig;
-use super::{constants::patterns, common::TrellisMessaging};
+use super::{constants::{patterns, errors}, common::TrellisMessaging};
 
 /// Handles discovery of Containerfiles in the source directory.
 pub struct ContainerfileDiscovery<'a> {
@@ -62,9 +62,10 @@ impl<'a> ContainerfileDiscovery<'a> {
 
         if found_paths_with_depth.is_empty() {
             return Err(anyhow!(
-                "Containerfile not found: {filename} (searched recursively in {} and all subdirectories). \
+                "{}: {filename} (searched recursively in {} and all subdirectories). \
                  Ensure the file exists and has correct permissions. \
                  Use 'find {} -name \"{}\"' to verify file location.",
+                errors::CONTAINERFILE_NOT_FOUND,
                 self.config.src_dir.display(),
                 self.config.src_dir.display(),
                 filename
@@ -117,7 +118,8 @@ impl<'a> ContainerfileDiscovery<'a> {
         
         if !missing_files.is_empty() {
             return Err(anyhow!(
-                "Missing required containerfiles: {}",
+                "{}: {}",
+            errors::MISSING_CONTAINERFILES,
                 missing_files.join(", ")
             ));
         }

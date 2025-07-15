@@ -5,7 +5,7 @@ use crate::config::TrellisConfig;
 use super::{
     discovery::ContainerfileDiscovery,
     common::{TrellisMessaging, PodmanContext},
-    constants::env_vars,
+    constants::{env_vars, commands, errors},
 };
 
 /// Type of container build operation.
@@ -49,12 +49,22 @@ pub struct PodmanCommandBuilder {
 impl PodmanCommandBuilder {
     pub fn new() -> Self {
         Self {
-            cmd: Command::new("podman"),
+            cmd: Command::new(commands::PODMAN_CMD),
         }
     }
 
+    /// Creates a new build command with standard capabilities
+    pub fn new_build_command() -> Self {
+        Self::new()
+            .build_subcommand()
+            .network_host()
+            .add_capability("sys_admin")
+            .add_capability("mknod")
+            .squash()
+    }
+
     pub fn build_subcommand(mut self) -> Self {
-        self.cmd.arg("build");
+        self.cmd.arg(commands::BUILD_SUBCMD);
         self
     }
 
@@ -119,13 +129,13 @@ impl PodmanCommandBuilder {
             Ok(())
         } else {
             // Capture more detailed error information
-            let output = Command::new("podman")
-                .arg("--version")
+            let output = Command::new(commands::PODMAN_CMD)
+                .arg(commands::VERSION_SUBCMD)
                 .output()
                 .podman_context("version check")?;
             
             if !output.status.success() {
-                return Err(anyhow!("Podman is not available or not working correctly"));
+                return Err(anyhow!(errors::PODMAN_NOT_AVAILABLE));
             }
             
             Err(anyhow!("Podman build failed with exit code: {:?}. Check podman logs for details. Ensure sufficient disk space and proper permissions.", status.code()))
@@ -199,12 +209,7 @@ impl<'a> ContainerBuilder<'a> {
             // For the first stage, use rootfs_base as BASE_IMAGE; for subsequent stages, use the previous stage
             let base_image = self.determine_base_image(i, build_type, &last_stage);
 
-            let mut builder = PodmanCommandBuilder::new()
-                .build_subcommand()
-                .network_host()
-                .add_capability("sys_admin")
-                .add_capability("mknod")
-                .squash()
+            let mut builder = PodmanCommandBuilder::new_build_command()
                 .containerfile(&containerfile_path)
                 .build_arg("BASE_IMAGE", &base_image)
                 .target(&stage)
@@ -304,4 +309,17 @@ impl<'a> ContainerBuilder<'a> {
         }
         Ok(builder)
     }
+}
+
+/// Validates that stages are not empty and returns appropriate error
+pub fn validate_stages_not_empty(stages: &[String], stage_type: &str) -> Result<()> {
+    if stages.is_empty() {
+        let error_msg = match stage_type {
+            "builder" => errors::NO_BUILDER_STAGES,
+            "rootfs" => errors::NO_ROOTFS_STAGES,
+            _ => "No stages defined",
+        };
+        return Err(anyhow!(error_msg));
+    }
+    Ok(())
 }
