@@ -5,6 +5,7 @@ use tempfile::TempDir;
 #[test]
 fn test_cli_help() {
     let mut cmd = Command::cargo_bin("trls").unwrap();
+    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
     cmd.arg("--help");
     cmd.assert()
         .success()
@@ -16,6 +17,7 @@ fn test_cli_version() {
     // The CLI doesn't support --version, so test -V instead, but clap doesn't add this by default
     // Let's just test help which should show the version in the usage
     let mut cmd = Command::cargo_bin("trls").unwrap();
+    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
     cmd.arg("--help");
     cmd.assert()
         .success()
@@ -26,6 +28,7 @@ fn test_cli_version() {
 fn test_build_builder_no_stages() {
     let temp_dir = TempDir::new().unwrap();
     let mut cmd = Command::cargo_bin("trls").unwrap();
+    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
     // Don't override builder-stages, so it should use empty default when no config
     cmd.arg("--src-dir").arg(temp_dir.path())
         .arg("build-builder");
@@ -35,13 +38,14 @@ fn test_build_builder_no_stages() {
     // If no system config, it should say "No builder stages defined"
     cmd.assert()
         .failure()
-        .stderr(predicate::str::contains("Containerfile not found").or(predicate::str::contains("No builder stages defined")));
+        .stderr(predicate::str::contains("Missing required containerfiles").or(predicate::str::contains("No builder stages defined")));
 }
 
 #[test]
 fn test_build_no_stages() {
     let temp_dir = TempDir::new().unwrap();
     let mut cmd = Command::cargo_bin("trls").unwrap();
+    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
     // Don't override rootfs-stages, so it should use empty default when no config
     cmd.arg("--src-dir").arg(temp_dir.path())
         .arg("build");
@@ -49,7 +53,7 @@ fn test_build_no_stages() {
     // The error will depend on whether system config exists
     cmd.assert()
         .failure()
-        .stderr(predicate::str::contains("Containerfile not found").or(predicate::str::contains("No rootfs stages defined")));
+        .stderr(predicate::str::contains("Missing required containerfiles").or(predicate::str::contains("No rootfs stages defined")));
 }
 
 #[test]
@@ -57,6 +61,7 @@ fn test_build_builder_with_missing_containerfile() {
     let temp_dir = TempDir::new().unwrap();
     
     let mut cmd = Command::cargo_bin("trls").unwrap();
+    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
     cmd.arg("--src-dir")
         .arg(temp_dir.path())
         .arg("--builder-stages")
@@ -65,7 +70,7 @@ fn test_build_builder_with_missing_containerfile() {
     
     cmd.assert()
         .failure()
-        .stderr(predicate::str::contains("Containerfile not found"));
+        .stderr(predicate::str::contains("Missing required containerfiles"));
 }
 
 #[test]
@@ -73,6 +78,7 @@ fn test_build_with_missing_containerfile() {
     let temp_dir = TempDir::new().unwrap();
     
     let mut cmd = Command::cargo_bin("trls").unwrap();
+    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
     cmd.arg("--src-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-stages")
@@ -81,13 +87,14 @@ fn test_build_with_missing_containerfile() {
     
     cmd.assert()
         .failure()
-        .stderr(predicate::str::contains("Containerfile not found"));
+        .stderr(predicate::str::contains("Missing required containerfiles"));
 }
 
 #[test]
 fn test_clean_command() {
     // Test that clean command runs and provides appropriate output
     let mut cmd = Command::cargo_bin("trls").unwrap();
+    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
     cmd.arg("clean");
     
     let output = cmd.output().unwrap();
@@ -110,6 +117,7 @@ fn test_clean_command() {
 fn test_clean_command_with_custom_tags() {
     // Test that clean command works with custom tags
     let mut cmd = Command::cargo_bin("trls").unwrap();
+    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
     cmd.arg("--builder-tag")
         .arg("custom-builder")
         .arg("--rootfs-tag")
@@ -136,6 +144,7 @@ fn test_config_override_builder_tag() {
     let temp_dir = TempDir::new().unwrap();
     
     let mut cmd = Command::cargo_bin("trls").unwrap();
+    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
     cmd.arg("--builder-tag")
         .arg("custom-builder")
         .arg("--src-dir")
@@ -146,7 +155,7 @@ fn test_config_override_builder_tag() {
     
     cmd.assert()
         .failure()
-        .stderr(predicate::str::contains("Containerfile not found"));
+        .stderr(predicate::str::contains("Missing required containerfiles"));
 }
 
 #[test]
@@ -154,6 +163,7 @@ fn test_config_override_rootfs_tag() {
     let temp_dir = TempDir::new().unwrap();
     
     let mut cmd = Command::cargo_bin("trls").unwrap();
+    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
     cmd.arg("--rootfs-tag")
         .arg("custom-rootfs")
         .arg("--src-dir")
@@ -164,12 +174,13 @@ fn test_config_override_rootfs_tag() {
     
     cmd.assert()
         .failure()
-        .stderr(predicate::str::contains("Containerfile not found"));
+        .stderr(predicate::str::contains("Missing required containerfiles"));
 }
 
 #[test]
 fn test_run_command_with_args() {
     let mut cmd = Command::cargo_bin("trls").unwrap();
+    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
     cmd.arg("run")
         .arg("--")
         .arg("echo")
@@ -185,13 +196,14 @@ fn test_run_command_with_args() {
 fn test_update_command() {
     let temp_dir = TempDir::new().unwrap();
     let mut cmd = Command::cargo_bin("trls").unwrap();
+    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
     cmd.arg("--src-dir").arg(temp_dir.path())
         .arg("update");
     
     // This will likely fail since we don't have stages defined, but it tests the command
     cmd.assert()
         .failure()
-        .stderr(predicate::str::contains("Containerfile not found").or(predicate::str::contains("No rootfs stages defined")));
+        .stderr(predicate::str::contains("Missing required containerfiles").or(predicate::str::contains("No rootfs stages defined")));
 }
 
 #[test]
@@ -199,6 +211,7 @@ fn test_multiple_stages() {
     let temp_dir = TempDir::new().unwrap();
     
     let mut cmd = Command::cargo_bin("trls").unwrap();
+    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
     cmd.arg("--src-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-stages")
@@ -207,7 +220,7 @@ fn test_multiple_stages() {
     
     cmd.assert()
         .failure()
-        .stderr(predicate::str::contains("Containerfile not found"));
+        .stderr(predicate::str::contains("Missing required containerfiles"));
 }
 
 #[test]
@@ -215,6 +228,7 @@ fn test_extra_contexts() {
     let temp_dir = TempDir::new().unwrap();
     
     let mut cmd = Command::cargo_bin("trls").unwrap();
+    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
     cmd.arg("--src-dir")
         .arg(temp_dir.path())
         .arg("--extra-contexts")
@@ -225,7 +239,7 @@ fn test_extra_contexts() {
     
     cmd.assert()
         .failure()
-        .stderr(predicate::str::contains("Containerfile not found"));
+        .stderr(predicate::str::contains("Missing required containerfiles"));
 }
 
 #[test]
@@ -233,6 +247,7 @@ fn test_extra_mounts() {
     let temp_dir = TempDir::new().unwrap();
     
     let mut cmd = Command::cargo_bin("trls").unwrap();
+    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
     cmd.arg("--src-dir")
         .arg(temp_dir.path())
         .arg("--extra-mounts")
@@ -243,5 +258,5 @@ fn test_extra_mounts() {
     
     cmd.assert()
         .failure()
-        .stderr(predicate::str::contains("Containerfile not found"));
+        .stderr(predicate::str::contains("Missing required containerfiles"));
 }

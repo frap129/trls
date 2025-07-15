@@ -72,7 +72,8 @@ fn test_build_with_flat_containerfiles() {
     setup_test_containerfiles(&temp_dir, &["base"]);
     
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.arg("--src-dir")
+    cmd.env("TRLS_SKIP_ROOT_CHECK", "1")
+        .arg("--src-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-stages")
         .arg("base")
@@ -93,7 +94,8 @@ fn test_build_with_nested_containerfiles() {
     setup_nested_containerfiles(&temp_dir, &[("base", "base")]);
     
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.arg("--src-dir")
+    cmd.env("TRLS_SKIP_ROOT_CHECK", "1")
+        .arg("--src-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-stages")
         .arg("base")
@@ -171,7 +173,8 @@ fn test_error_handling_with_invalid_stage() {
     setup_test_containerfiles(&temp_dir, &["base"]);
     
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.arg("--src-dir")
+    cmd.env("TRLS_SKIP_ROOT_CHECK", "1")
+        .arg("--src-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-stages")
         .arg("nonexistent")
@@ -179,5 +182,5 @@ fn test_error_handling_with_invalid_stage() {
     
     cmd.assert()
         .failure()
-        .stderr(predicate::str::contains("Containerfile not found"));
+        .stderr(predicate::str::contains("Missing required containerfiles"));
 }
