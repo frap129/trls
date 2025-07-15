@@ -3,6 +3,7 @@
 
 [build]
 builder_stages = ["base"]
+rootfs_base = "scratch"
 rootfs_stages = ["base", "system"]
 builder_tag = "trellis-builder"
 rootfs_tag = "trellis-rootfs"

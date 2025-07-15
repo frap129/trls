@@ -47,6 +47,10 @@ pub struct Cli {
     #[arg(long, value_delimiter = ',')]
     pub rootfs_stages: Vec<String>,
 
+    /// Base image for the first stage of the rootfs build
+    #[arg(long, default_value = "scratch")]
+    pub rootfs_base: String,
+
     /// Name of the tag to use for the rootfs container
     #[arg(long, default_value = containers::DEFAULT_ROOTFS_TAG)]
     pub rootfs_tag: String,

@@ -52,6 +52,7 @@ pub struct Config {
 pub struct BuildConfig {
     pub builder_stages: Option<Vec<String>>,
     pub rootfs_stages: Option<Vec<String>>,
+    pub rootfs_base: Option<String>,
     pub builder_tag: Option<String>,
     pub rootfs_tag: Option<String>,
     pub podman_build_cache: Option<bool>,
@@ -74,6 +75,7 @@ impl Default for Config {
             build: Some(BuildConfig {
                 builder_stages: None,
                 rootfs_stages: None,
+                rootfs_base: Some("scratch".to_string()),
                 builder_tag: Some(containers::DEFAULT_BUILDER_TAG.to_string()),
                 rootfs_tag: Some(containers::DEFAULT_ROOTFS_TAG.to_string()),
                 podman_build_cache: Some(false),
@@ -101,6 +103,7 @@ pub struct TrellisConfig {
     pub aur_cache: Option<PathBuf>,
     pub src_dir: PathBuf,
     pub rootfs_stages: Vec<String>,
+    pub rootfs_base: String,
     pub extra_contexts: Vec<String>,
     pub extra_mounts: Vec<PathBuf>,
     pub rootfs_tag: String,
@@ -142,6 +145,9 @@ impl TrellisConfig {
             }),
             rootfs_stages: override_field!(vec, cli.rootfs_stages, || {
                 build_config.and_then(|b| b.rootfs_stages.clone())
+            }),
+            rootfs_base: override_field!(string, cli.rootfs_base, "scratch", || {
+                build_config.and_then(|b| b.rootfs_base.clone())
             }),
             extra_contexts: override_field!(vec, cli.extra_contexts, || {
                 build_config.and_then(|b| b.extra_contexts.clone())

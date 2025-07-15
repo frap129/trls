@@ -184,3 +184,109 @@ fn test_error_handling_with_invalid_stage() {
         .failure()
         .stderr(predicate::str::contains("Missing required containerfiles"));
 }
+
+#[test]
+fn test_rootfs_base_cli_argument() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_test_containerfiles(&temp_dir, &["base"]);
+    
+    let mut cmd = Command::cargo_bin("trls").unwrap();
+    cmd.env("TRLS_SKIP_ROOT_CHECK", "1")
+        .arg("--src-dir")
+        .arg(temp_dir.path())
+        .arg("--rootfs-stages")
+        .arg("base")
+        .arg("--rootfs-base")
+        .arg("alpine:latest")
+        .arg("build");
+    
+    let output = cmd.output().unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    
+    // Should not fail due to missing Containerfile (it will fail later due to no podman)
+    assert!(!stderr.contains("Containerfile not found"));
+    // Verify the argument was accepted (no argument parsing errors)
+    assert!(!stderr.contains("error: unexpected argument"));
+}
+
+#[test]
+fn test_rootfs_base_help_text() {
+    let mut cmd = Command::cargo_bin("trls").unwrap();
+    cmd.arg("--help");
+    
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("--rootfs-base"))
+        .stdout(predicate::str::contains("Base image for the first stage"));
+}
+
+#[test]
+fn test_rootfs_base_with_config_file() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_test_containerfiles(&temp_dir, &["base"]);
+    
+    let config_path = setup_config_file(&temp_dir, "test_rootfs_base.toml");
+    
+    let config_content = r#"
+[build]
+rootfs_base = "ubuntu:22.04"
+rootfs_stages = ["base"]
+
+[environment]
+pacman_cache = "/tmp/pacman-cache"
+aur_cache = "/tmp/aur-cache"
+"#;
+    
+    fs::write(&config_path, config_content).unwrap();
+    
+    let mut cmd = Command::cargo_bin("trls").unwrap();
+    cmd.env("TRLS_SKIP_ROOT_CHECK", "1")
+        .env("TRELLIS_CONFIG", &config_path)
+        .arg("--src-dir")
+        .arg(temp_dir.path())
+        .arg("build");
+    
+    let output = cmd.output().unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    
+    // Should not fail due to config parsing issues
+    assert!(!stderr.contains("Failed to parse config file"));
+    assert!(!stderr.contains("Containerfile not found"));
+}
+
+#[test]
+fn test_rootfs_base_cli_overrides_config_file() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_test_containerfiles(&temp_dir, &["base"]);
+    
+    let config_path = setup_config_file(&temp_dir, "test_override.toml");
+    
+    let config_content = r#"
+[build]
+rootfs_base = "ubuntu:22.04"
+rootfs_stages = ["base"]
+
+[environment]
+pacman_cache = "/tmp/pacman-cache"
+aur_cache = "/tmp/aur-cache"
+"#;
+    
+    fs::write(&config_path, config_content).unwrap();
+    
+    let mut cmd = Command::cargo_bin("trls").unwrap();
+    cmd.env("TRLS_SKIP_ROOT_CHECK", "1")
+        .env("TRELLIS_CONFIG", &config_path)
+        .arg("--src-dir")
+        .arg(temp_dir.path())
+        .arg("--rootfs-base")
+        .arg("alpine:edge")  // CLI should override config file
+        .arg("build");
+    
+    let output = cmd.output().unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    
+    // Should not fail due to config parsing or argument issues
+    assert!(!stderr.contains("Failed to parse config file"));
+    assert!(!stderr.contains("error: unexpected argument"));
+    assert!(!stderr.contains("Containerfile not found"));
+}

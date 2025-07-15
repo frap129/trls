@@ -149,6 +149,19 @@ impl<'a> ContainerBuilder<'a> {
         }
     }
 
+    /// Determines the base image for a given stage in the build process.
+    /// This method is primarily for testing the base image selection logic.
+    pub fn determine_base_image(&self, _stage_index: usize, build_type: BuildType, last_stage: &str) -> String {
+        if last_stage.is_empty() {
+            match build_type {
+                BuildType::Rootfs => self.config.rootfs_base.clone(),
+                BuildType::Builder => "scratch".to_string(),
+            }
+        } else {
+            format!("localhost/{last_stage}")
+        }
+    }
+
     /// Builds a multi-stage container with improved error handling and resource management.
     pub fn build_multistage_container(
         &self,
@@ -183,6 +196,9 @@ impl<'a> ContainerBuilder<'a> {
             self.msg(&format!("Building stage {}/{}: {} -> {}", 
                 i + 1, build_stages.len(), build_stage, tag));
 
+            // For the first stage, use rootfs_base as BASE_IMAGE; for subsequent stages, use the previous stage
+            let base_image = self.determine_base_image(i, build_type, &last_stage);
+
             let mut builder = PodmanCommandBuilder::new()
                 .build_subcommand()
                 .network_host()
@@ -190,7 +206,7 @@ impl<'a> ContainerBuilder<'a> {
                 .add_capability("mknod")
                 .squash()
                 .containerfile(&containerfile_path)
-                .build_arg("BASE_IMAGE", &format!("localhost/{last_stage}"))
+                .build_arg("BASE_IMAGE", &base_image)
                 .target(&stage)
                 .tag(&tag)
                 .no_cache(!self.config.podman_build_cache);

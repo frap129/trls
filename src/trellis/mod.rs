@@ -22,7 +22,7 @@ pub mod discovery;
 pub mod common;
 pub mod constants;
 
-pub use builder::ContainerBuilder;
+pub use builder::{ContainerBuilder, BuildType};
 pub use cleaner::ImageCleaner;
 pub use runner::ContainerRunner;
 

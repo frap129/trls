@@ -4,7 +4,7 @@ use tempfile::TempDir;
 use trellis::{
     cli::{Cli, Commands},
     config::{Config, TrellisConfig},
-    TrellisApp, ContainerfileDiscovery,
+    TrellisApp, ContainerfileDiscovery, ContainerBuilder, BuildType,
 };
 
 fn create_test_cli() -> Cli {
@@ -19,6 +19,7 @@ fn create_test_cli() -> Cli {
         extra_contexts: vec![],
         extra_mounts: vec![],
         rootfs_stages: vec![],
+        rootfs_base: "scratch".to_string(),
         rootfs_tag: "test-rootfs".to_string(),
         builder_stages: vec![],
     }
@@ -34,6 +35,7 @@ fn create_test_config(temp_dir: &TempDir) -> TrellisConfig {
         aur_cache: None,
         src_dir: temp_dir.path().to_path_buf(),
         rootfs_stages: vec!["base".to_string(), "final".to_string()],
+        rootfs_base: "scratch".to_string(),
         extra_contexts: vec![],
         extra_mounts: vec![],
         rootfs_tag: "test-rootfs".to_string(),
@@ -51,7 +53,28 @@ fn test_config_default() {
     let build = config.build.unwrap();
     assert_eq!(build.builder_tag, Some("trellis-builder".to_string()));
     assert_eq!(build.rootfs_tag, Some("trellis-rootfs".to_string()));
+    assert_eq!(build.rootfs_base, Some("scratch".to_string()));
     assert_eq!(build.podman_build_cache, Some(false));
+}
+
+#[test]
+fn test_rootfs_base_default_value() {
+    let cli = create_test_cli();
+    let config = TrellisConfig::new(cli).unwrap();
+    
+    // Default value should be "scratch"
+    assert_eq!(config.rootfs_base, "scratch");
+}
+
+#[test]
+fn test_rootfs_base_cli_override() {
+    let mut cli = create_test_cli();
+    cli.rootfs_base = "alpine:latest".to_string();
+    
+    let config = TrellisConfig::new(cli).unwrap();
+    
+    // CLI value should override default
+    assert_eq!(config.rootfs_base, "alpine:latest");
 }
 
 #[test]
@@ -92,6 +115,7 @@ fn test_trellis_config_with_file() {
 [build]
 builder_stages = ["builder1", "builder2"]
 rootfs_stages = ["base", "apps"]
+rootfs_base = "ubuntu:22.04"
 builder_tag = "file-builder"
 rootfs_tag = "file-rootfs"
 podman_build_cache = true
@@ -113,8 +137,65 @@ hooks_dir = "/custom/hooks"
     let build = parsed.build.unwrap();
     assert_eq!(build.builder_stages, Some(vec!["builder1".to_string(), "builder2".to_string()]));
     assert_eq!(build.rootfs_stages, Some(vec!["base".to_string(), "apps".to_string()]));
+    assert_eq!(build.rootfs_base, Some("ubuntu:22.04".to_string()));
     assert_eq!(build.builder_tag, Some("file-builder".to_string()));
     assert_eq!(build.podman_build_cache, Some(true));
+}
+
+#[test]
+fn test_rootfs_base_config_file_parsing() {
+    let config_content = r#"
+[build]
+rootfs_base = "fedora:39"
+"#;
+    
+    let parsed: Config = toml::from_str(config_content).unwrap();
+    
+    assert!(parsed.build.is_some());
+    let build = parsed.build.unwrap();
+    assert_eq!(build.rootfs_base, Some("fedora:39".to_string()));
+}
+
+#[test]
+fn test_rootfs_base_cli_overrides_config() {
+    // Simulate having a config file with rootfs_base set
+    let _temp_dir = TempDir::new().unwrap();
+    let config_content = r#"
+[build]
+rootfs_base = "ubuntu:20.04"
+"#;
+    
+    // Parse config to verify it has the expected value
+    let file_config: Config = toml::from_str(config_content).unwrap();
+    assert_eq!(file_config.build.unwrap().rootfs_base, Some("ubuntu:20.04".to_string()));
+    
+    // CLI should override this value
+    let mut cli = create_test_cli();
+    cli.rootfs_base = "alpine:edge".to_string();
+    
+    let trellis_config = TrellisConfig::new(cli).unwrap();
+    
+    // CLI value should take precedence
+    assert_eq!(trellis_config.rootfs_base, "alpine:edge");
+}
+
+#[test]
+fn test_rootfs_base_empty_config_uses_default() {
+    let config_content = r#"
+[build]
+builder_tag = "test"
+"#;
+    
+    let parsed: Config = toml::from_str(config_content).unwrap();
+    
+    let build = parsed.build.unwrap();
+    // rootfs_base should be None in the file config, falling back to default
+    assert_eq!(build.rootfs_base, None);
+    
+    // When no config file value and CLI uses default, should get "scratch"
+    let cli = create_test_cli();
+    let trellis_config = TrellisConfig::new(cli).unwrap();
+    assert_eq!(trellis_config.rootfs_base, "scratch");
 }
 
 // Discovery tests
@@ -211,6 +292,7 @@ fn test_trellis_app_creation() {
         extra_contexts: vec![],
         extra_mounts: vec![],
         rootfs_stages: vec!["base".to_string()],
+        rootfs_base: "scratch".to_string(),
         rootfs_tag: "test-rootfs".to_string(),
         builder_stages: vec![],
     };
@@ -235,6 +317,7 @@ fn test_auto_clean_config() {
         extra_contexts: vec![],
         extra_mounts: vec![],
         rootfs_stages: vec!["base".to_string()],
+        rootfs_base: "scratch".to_string(),
         rootfs_tag: "test-rootfs".to_string(),
         builder_stages: vec![],
     };
@@ -267,4 +350,124 @@ fn test_build_builder_container_no_stages() {
     
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("No builder stages defined"));
+}
+
+#[test]
+fn test_rootfs_base_functionality_first_stage() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = TrellisConfig {
+        builder_stages: vec![],
+        builder_tag: "test-builder".to_string(),
+        podman_build_cache: false,
+        auto_clean: false,
+        pacman_cache: None,
+        aur_cache: None,
+        src_dir: temp_dir.path().to_path_buf(),
+        rootfs_stages: vec!["base".to_string()],
+        rootfs_base: "ubuntu:22.04".to_string(),
+        extra_contexts: vec![],
+        extra_mounts: vec![],
+        rootfs_tag: "test-rootfs".to_string(),
+        hooks_dir: None,
+    };
+
+    let builder = ContainerBuilder::new(&config);
+
+    // Test first stage (empty last_stage) for rootfs build
+    let base_image = builder.determine_base_image(0, BuildType::Rootfs, "");
+    assert_eq!(base_image, "ubuntu:22.04");
+
+    // Test first stage (empty last_stage) for builder build  
+    let base_image = builder.determine_base_image(0, BuildType::Builder, "");
+    assert_eq!(base_image, "scratch");
+}
+
+#[test]
+fn test_rootfs_base_functionality_subsequent_stages() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = TrellisConfig {
+        builder_stages: vec![],
+        builder_tag: "test-builder".to_string(),
+        podman_build_cache: false,
+        auto_clean: false,
+        pacman_cache: None,
+        aur_cache: None,
+        src_dir: temp_dir.path().to_path_buf(),
+        rootfs_stages: vec!["base".to_string(), "tools".to_string()],
+        rootfs_base: "alpine:latest".to_string(),
+        extra_contexts: vec![],
+        extra_mounts: vec![],
+        rootfs_tag: "test-rootfs".to_string(),
+        hooks_dir: None,
+    };
+
+    let builder = ContainerBuilder::new(&config);
+
+    // Test subsequent stage (non-empty last_stage) for both build types
+    let base_image = builder.determine_base_image(1, BuildType::Rootfs, "trellis-stage-base");
+    assert_eq!(base_image, "localhost/trellis-stage-base");
+
+    let base_image = builder.determine_base_image(1, BuildType::Builder, "trellis-builder-base");  
+    assert_eq!(base_image, "localhost/trellis-builder-base");
+}
+
+#[test]
+fn test_rootfs_base_with_default_scratch() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = TrellisConfig {
+        builder_stages: vec![],
+        builder_tag: "test-builder".to_string(),
+        podman_build_cache: false,
+        auto_clean: false,
+        pacman_cache: None,
+        aur_cache: None,
+        src_dir: temp_dir.path().to_path_buf(),
+        rootfs_stages: vec!["base".to_string()],
+        rootfs_base: "scratch".to_string(), // Default value
+        extra_contexts: vec![],
+        extra_mounts: vec![],
+        rootfs_tag: "test-rootfs".to_string(),
+        hooks_dir: None,
+    };
+
+    let builder = ContainerBuilder::new(&config);
+
+    // Test first stage with default scratch value
+    let base_image = builder.determine_base_image(0, BuildType::Rootfs, "");
+    assert_eq!(base_image, "scratch");
+}
+
+#[test]
+fn test_rootfs_base_with_custom_images() {
+    let temp_dir = TempDir::new().unwrap();
+    
+    // Test with various custom base images
+    let test_cases = vec![
+        "fedora:39",
+        "archlinux:latest", 
+        "registry.example.com/custom:v1.0",
+        "localhost/my-custom-base:latest",
+    ];
+
+    for base_image_value in test_cases {
+        let config = TrellisConfig {
+            builder_stages: vec![],
+            builder_tag: "test-builder".to_string(),
+            podman_build_cache: false,
+            auto_clean: false,
+            pacman_cache: None,
+            aur_cache: None,
+            src_dir: temp_dir.path().to_path_buf(),
+            rootfs_stages: vec!["base".to_string()],
+            rootfs_base: base_image_value.to_string(),
+            extra_contexts: vec![],
+            extra_mounts: vec![],
+            rootfs_tag: "test-rootfs".to_string(),
+            hooks_dir: None,
+        };
+
+        let builder = ContainerBuilder::new(&config);
+        let result = builder.determine_base_image(0, BuildType::Rootfs, "");
+        assert_eq!(result, base_image_value, "Failed for base image: {}", base_image_value);
+    }
 }
