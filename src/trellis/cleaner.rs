@@ -1,5 +1,3 @@
-//! Image cleanup and management with optimized batch operations.
-
 use std::process::Command;
 use anyhow::{anyhow, Context, Result};
 

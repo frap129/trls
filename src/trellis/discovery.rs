@@ -1,5 +1,3 @@
-//! Containerfile discovery using efficient directory traversal.
-
 use anyhow::{anyhow, Result};
 use walkdir::WalkDir;
 

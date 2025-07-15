@@ -1,5 +1,3 @@
-//! Container execution with improved command construction and error handling.
-
 use std::process::Command;
 use anyhow::{anyhow, Context, Result};
 

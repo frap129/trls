@@ -1,5 +1,3 @@
-//! Container building operations with improved command construction and error handling.
-
 use std::{env, fs, process::Command};
 use anyhow::{anyhow, Context, Result};
 
