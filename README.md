@@ -17,8 +17,7 @@ A Rust-based CLI utility for managing multi-stage bootc container builds with Po
 ```bash
 git clone <repository-url>
 cd trellis
-cargo build --release
-sudo cp target/release/trls /usr/local/bin/
+just install
 ```
 
 ### Configuration
