@@ -42,14 +42,6 @@ fn is_running_as_root() -> Result<bool> {
             return Ok(libc::getuid() == 0);
         }
     }
-    
-    // Method 3: Windows or other platforms - conservative approach
-    #[cfg(not(unix))]
-    {
-        // On non-Unix systems, assume we need to prompt the user
-        // This is a conservative approach for cross-platform compatibility
-        return Ok(false);
-    }
 }
 
 /// Prompts the user to continue when not running as root.
