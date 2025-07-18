@@ -8,39 +8,9 @@ use crate::{
     trellis::constants::{containers, paths, env_vars},
 };
 
-/// Macro to reduce boilerplate when overriding configuration fields.
-/// 
-/// This macro generates helper functions for merging CLI values with configuration file values,
-/// with CLI values taking precedence.
-macro_rules! override_field {
-    // Vector field override
-    (vec, $cli_value:expr, $file_value_fn:expr) => {
-        if !$cli_value.is_empty() {
-            $cli_value
-        } else {
-            $file_value_fn().unwrap_or_default()
-        }
-    };
-    
-    // String field override with default value
-    (string, $cli_value:expr, $default_value:expr, $file_value_fn:expr) => {
-        if $cli_value != $default_value {
-            $cli_value
-        } else {
-            $file_value_fn().unwrap_or_else(|| $default_value.to_string())
-        }
-    };
-    
-    // Optional field override
-    (option, $cli_value:expr, $file_value_fn:expr) => {
-        $cli_value.or_else($file_value_fn)
-    };
-    
-    // Boolean field override with CLI precedence
-    (bool, $cli_value:expr, $file_value_fn:expr, $default:expr) => {
-        $cli_value.or_else($file_value_fn).unwrap_or($default)
-    };
-}
+use super::merger::{ConfigMerger, BoolMerger};
+
+
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
@@ -140,38 +110,58 @@ impl TrellisConfig {
         let env_config = file_config.environment.as_ref();
 
         Ok(TrellisConfig {
-            builder_stages: override_field!(vec, cli.builder_stages, || {
-                Self::get_build_field(build_config, |b| &b.builder_stages)
-            }),
-            rootfs_stages: override_field!(vec, cli.rootfs_stages, || {
-                Self::get_build_field(build_config, |b| &b.rootfs_stages)
-            }),
-            rootfs_base: override_field!(string, cli.rootfs_base, "scratch", || {
-                Self::get_build_field(build_config, |b| &b.rootfs_base)
-            }),
-            extra_contexts: override_field!(vec, cli.extra_contexts, || {
-                Self::get_build_field(build_config, |b| &b.extra_contexts)
-            }),
-            extra_mounts: override_field!(vec, cli.extra_mounts, || {
-                Self::get_build_field(build_config, |b| &b.extra_mounts)
-            }),
-            builder_tag: override_field!(string, cli.builder_tag, containers::DEFAULT_BUILDER_TAG, || {
-                Self::get_build_field(build_config, |b| &b.builder_tag)
-            }),
-            rootfs_tag: override_field!(string, cli.rootfs_tag, containers::DEFAULT_ROOTFS_TAG, || {
-                Self::get_build_field(build_config, |b| &b.rootfs_tag)
-            }),
-            podman_build_cache: override_field!(bool, cli.podman_build_cache, || {
-                build_config.and_then(|b| b.podman_build_cache)
-            }, false),
+            builder_stages: Vec::merge(
+                cli.builder_stages,
+                Self::get_build_field(build_config, |b| &b.builder_stages),
+                Vec::new()
+            ),
+            rootfs_stages: Vec::merge(
+                cli.rootfs_stages,
+                Self::get_build_field(build_config, |b| &b.rootfs_stages),
+                Vec::new()
+            ),
+            rootfs_base: String::merge(
+                cli.rootfs_base,
+                Self::get_build_field(build_config, |b| &b.rootfs_base),
+                "scratch".to_string()
+            ),
+            extra_contexts: Vec::merge(
+                cli.extra_contexts,
+                Self::get_build_field(build_config, |b| &b.extra_contexts),
+                Vec::new()
+            ),
+            extra_mounts: Vec::merge(
+                cli.extra_mounts,
+                Self::get_build_field(build_config, |b| &b.extra_mounts),
+                Vec::new()
+            ),
+            builder_tag: String::merge(
+                cli.builder_tag,
+                Self::get_build_field(build_config, |b| &b.builder_tag),
+                containers::DEFAULT_BUILDER_TAG.to_string()
+            ),
+            rootfs_tag: String::merge(
+                cli.rootfs_tag,
+                Self::get_build_field(build_config, |b| &b.rootfs_tag),
+                containers::DEFAULT_ROOTFS_TAG.to_string()
+            ),
+            podman_build_cache: BoolMerger::merge(
+                cli.podman_build_cache,
+                build_config.and_then(|b| b.podman_build_cache),
+                false
+            ),
             auto_clean: cli.auto_clean
                 || build_config.and_then(|b| b.auto_clean).unwrap_or(false),
-            pacman_cache: override_field!(option, cli.pacman_cache, || {
-                Self::get_env_field(env_config, |e| &e.pacman_cache)
-            }),
-            aur_cache: override_field!(option, cli.aur_cache, || {
-                Self::get_env_field(env_config, |e| &e.aur_cache)
-            }),
+            pacman_cache: Option::merge(
+                cli.pacman_cache,
+                Some(Self::get_env_field(env_config, |e| &e.pacman_cache)),
+                None
+            ),
+            aur_cache: Option::merge(
+                cli.aur_cache,
+                Some(Self::get_env_field(env_config, |e| &e.aur_cache)),
+                None
+            ),
             src_dir: cli.src_dir
                 .or_else(|| env_config.and_then(|e| e.src_dir.clone()))
                 .unwrap_or_else(|| PathBuf::from(paths::DEFAULT_SRC_DIR)),
