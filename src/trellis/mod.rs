@@ -10,7 +10,7 @@ use anyhow::Result;
 
 use crate::{
     cli::{Cli, Commands},
-    config::TrellisConfig,
+    config::{TrellisConfig, ConfigValidator},
 };
 
 use common::TrellisMessaging;
@@ -22,7 +22,7 @@ pub mod discovery;
 pub mod common;
 pub mod constants;
 
-pub use builder::{ContainerBuilder, validate_stages_not_empty};
+pub use builder::ContainerBuilder;
 pub use cleaner::ImageCleaner;
 pub use runner::ContainerRunner;
 
@@ -74,7 +74,7 @@ impl<'a> Trellis<'a> {
     }
 
     pub fn build_builder_container(&self) -> Result<()> {
-        validate_stages_not_empty(&self.config.builder_stages, "builder")?;
+        ConfigValidator::validate_stages(&self.config.builder_stages, "builder")?;
 
         self.builder.build_multistage_container(
             "builder",
@@ -92,7 +92,7 @@ impl<'a> Trellis<'a> {
     }
 
     pub fn build_rootfs_container(&self) -> Result<()> {
-        validate_stages_not_empty(&self.config.rootfs_stages, "rootfs")?;
+        ConfigValidator::validate_stages(&self.config.rootfs_stages, "rootfs")?;
 
         self.builder.build_multistage_container(
             "stage",

@@ -67,6 +67,7 @@ fn test_empty_stages_validation() {
     let mut cli = create_minimal_cli();
     cli.builder_stages = vec![]; // Empty stages
     cli.rootfs_stages = vec![]; // Empty stages
+    cli.src_dir = Some(temp_dir.path().to_path_buf()); // Use temp dir as src_dir
     
     // Temporarily override the environment variable for this test
     let original_config = std::env::var("TRELLIS_CONFIG").ok();

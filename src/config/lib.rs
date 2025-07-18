@@ -9,6 +9,7 @@ use crate::{
 };
 
 use super::merger::{ConfigMerger, BoolMerger};
+use super::validator::ConfigValidator;
 
 
 
@@ -104,12 +105,12 @@ impl TrellisConfig {
             Config::default()
         };
 
-        Self::validate_config(&file_config)?;
+
 
         let build_config = file_config.build.as_ref();
         let env_config = file_config.environment.as_ref();
 
-        Ok(TrellisConfig {
+        let config = TrellisConfig {
             builder_stages: Vec::merge(
                 cli.builder_stages,
                 Self::get_build_field(build_config, |b| &b.builder_stages),
@@ -166,25 +167,15 @@ impl TrellisConfig {
                 .or_else(|| env_config.and_then(|e| e.src_dir.clone()))
                 .unwrap_or_else(|| PathBuf::from(paths::DEFAULT_SRC_DIR)),
             hooks_dir: Self::resolve_hooks_dir(env_config),
-        })
+        };
+
+        // Validate the complete configuration
+        ConfigValidator::validate_complete(&config)?;
+        
+        Ok(config)
     }
     
-    /// Validates the configuration for common issues.
-    fn validate_config(config: &Config) -> Result<()> {
-        if let Some(build) = &config.build {
-            if let Some(stages) = &build.builder_stages {
-                if stages.is_empty() {
-                    return Err(anyhow::anyhow!("Builder stages cannot be empty"));
-                }
-            }
-            if let Some(stages) = &build.rootfs_stages {
-                if stages.is_empty() {
-                    return Err(anyhow::anyhow!("Rootfs stages cannot be empty"));
-                }
-            }
-        }
-        Ok(())
-    }
+
     
     /// Resolves the hooks directory with proper existence checking.
     fn resolve_hooks_dir(env_config: Option<&EnvironmentConfig>) -> Option<PathBuf> {

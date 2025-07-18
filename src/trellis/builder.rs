@@ -311,15 +311,4 @@ impl<'a> ContainerBuilder<'a> {
     }
 }
 
-/// Validates that stages are not empty and returns appropriate error
-pub fn validate_stages_not_empty(stages: &[String], stage_type: &str) -> Result<()> {
-    if stages.is_empty() {
-        let error_msg = match stage_type {
-            "builder" => errors::NO_BUILDER_STAGES,
-            "rootfs" => errors::NO_ROOTFS_STAGES,
-            _ => "No stages defined",
-        };
-        return Err(anyhow!(error_msg));
-    }
-    Ok(())
-}
+
