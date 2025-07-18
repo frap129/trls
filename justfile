@@ -49,42 +49,43 @@ release:
 release-test: test release
     @echo "✅ Release build completed with all tests passing"
 
-# Install to system (requires sudo)
+# Install binary to system (requires sudo)
 install: release-test
     sudo install -Dm755 target/release/trls /usr/local/bin/trls
-    sudo install -Dm644 trellis.toml.example /etc/trellis/trellis.toml
-    sudo install -Dm755 hooks/50-dracut-setup.sh /etc/trellis/hooks.d/50-dracut-setup.sh
-    sudo install -Dm755 hooks/50-sbctl-sign.sh /etc/trellis/hooks.d/50-sbctl-sign.sh
     sudo mkdir -p /var/lib/trellis/src
     sudo mkdir -p /var/cache/trellis/aur
     @echo "✅ Trellis installed to /usr/local/bin/trls"
-    @echo "✅ Config installed to /etc/trellis/trellis.toml"
-    @echo "✅ Hooks installed to /etc/trellis/hooks.d/"
     @echo "✅ Default directories created: /var/lib/trellis/src, /var/cache/trellis/aur"
+    @echo "ℹ️  Run 'just install-hooks' to install system hooks"
 
-# Install to custom directory
+# Install binary to custom directory
 install-to PREFIX: release-test
     sudo install -Dm755 target/release/trls {{PREFIX}}/bin/trls
-    sudo install -Dm644 trellis.toml.example {{PREFIX}}/etc/trellis/trellis.toml
-    sudo install -Dm755 hooks/50-dracut-setup.sh {{PREFIX}}/etc/trellis/hooks.d/50-dracut-setup.sh
-    sudo install -Dm755 hooks/50-sbctl-sign.sh {{PREFIX}}/etc/trellis/hooks.d/50-sbctl-sign.sh
     sudo mkdir -p /var/lib/trellis/src
     sudo mkdir -p /var/cache/trellis/aur
     @echo "✅ Trellis installed to {{PREFIX}}/bin/trls"
-    @echo "✅ Config installed to {{PREFIX}}/etc/trellis/trellis.toml"
-    @echo "✅ Hooks installed to {{PREFIX}}/etc/trellis/hooks.d/"
     @echo "✅ Default directories created: /var/lib/trellis/src, /var/cache/trellis/aur"
+    @echo "ℹ️  Run 'just install-hooks' to install system hooks"
 
-# Uninstall from system
+# Install system hooks (requires sudo)
+install-hooks:
+    sudo install -Dm755 hooks/50-dracut-setup.sh /etc/trellis/hooks.d/50-dracut-setup.sh
+    sudo install -Dm755 hooks/50-sbctl-sign.sh /etc/trellis/hooks.d/50-sbctl-sign.sh
+    @echo "✅ Hooks installed to /etc/trellis/hooks.d/"
+
+# Uninstall binary from system
 uninstall:
     sudo rm -f /usr/local/bin/trls
-    sudo rm -f /etc/trellis/trellis.toml
+    @echo "✅ Trellis uninstalled from /usr/local/bin/trls"
+    @echo "ℹ️  Cache and src directories preserved: /var/lib/trellis/src, /var/cache/trellis/aur"
+    @echo "ℹ️  Run 'just uninstall-hooks' to remove system hooks"
+    @echo "ℹ️  Remove cache manually if desired: sudo rm -rf /var/lib/trellis /var/cache/trellis"
+
+# Uninstall system hooks
+uninstall-hooks:
     sudo rm -rf /etc/trellis/hooks.d
     sudo rmdir /etc/trellis 2>/dev/null || true
-    @echo "✅ Trellis uninstalled from /usr/local/bin/trls"
-    @echo "✅ Config and hooks removed from /etc/trellis/"
-    @echo "ℹ️  Cache and src directories preserved: /var/lib/trellis/src, /var/cache/trellis/aur"
-    @echo "ℹ️  Remove manually if desired: sudo rm -rf /var/lib/trellis /var/cache/trellis"
+    @echo "✅ Hooks removed from /etc/trellis/"
 
 # Development helpers
 # ===================
@@ -93,13 +94,7 @@ uninstall:
 run *ARGS:
     cargo run -- {{ARGS}}
 
-# Watch for changes and rebuild
-watch:
-    cargo watch -x build
 
-# Watch for changes and run tests
-watch-test:
-    cargo watch -x test
 
 # Generate documentation
 docs:
@@ -115,10 +110,13 @@ info:
 # Development environment setup
 # =============================
 
-# Install development dependencies (Arch Linux)
+# Install development dependencies
 setup-dev:
-    sudo pacman -S --needed just cargo-watch jq
-    cargo install cargo-watch
+    @echo "Installing development dependencies..."
+    @echo "Please install 'just' and 'jq' using your system package manager"
+    @echo "For Arch Linux: sudo pacman -S --needed just jq"
+    @echo "For Ubuntu/Debian: sudo apt install just jq"
+    @echo "For other systems, see: https://github.com/casey/just#installation"
 
 # Install pre-commit hooks
 setup-hooks:
@@ -136,7 +134,7 @@ package VERSION: release-test
     set -euo pipefail
     ARCHIVE="trellis-{{VERSION}}-$(rustc --version --verbose | grep host | cut -d' ' -f2).tar.gz"
     mkdir -p dist/trellis-{{VERSION}}
-    cp target/release/trls dist/trellis-{{VERSION}}/trellis
+    cp target/release/trls dist/trellis-{{VERSION}}/trls
     cp README.md dist/trellis-{{VERSION}}/
     cp trellis.toml.example dist/trellis-{{VERSION}}/
     cp -r hooks dist/trellis-{{VERSION}}/
@@ -148,30 +146,9 @@ package VERSION: release-test
 ci: check test release
     @echo "✅ All CI checks passed"
 
-# Performance testing
-# ===================
 
-# Build with performance profiling
-perf-build:
-    cargo build --release --features perf
 
-# Benchmark (if benchmarks exist)
-bench:
-    cargo bench
 
-# Container testing helpers
-# =========================
-
-# Test with example containerfiles (requires test setup)
-test-containers:
-    #!/bin/bash
-    set -euo pipefail
-    if [ ! -d "test-containers" ]; then
-        echo "❌ test-containers directory not found"
-        echo "Create test containerfiles in test-containers/ directory"
-        exit 1
-    fi
-    just run --src-dir test-containers build
 
 # System integration test (requires podman)
 test-integration:
