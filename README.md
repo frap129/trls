@@ -1,14 +1,25 @@
-# Trellis - Container Build System
+# Trellis - Modular Arch-based bootc Image Builder
 
-A Rust-based CLI utility for managing multi-stage bootc container builds with Podman. This is a port of the original bash script to Rust for better performance, error handling, and maintainability.
+Trellis is a tool for building and using modular, arch-based bootc images. It provides a Rust-based CLI for creating immutable system images with atomic updates through bootc integration.
+
+## What is bootc?
+
+bootc enables container-native Linux systems with atomic updates. Instead of traditional package management, your entire system becomes an immutable container image that can be atomically updated, rolled back, and deployed consistently across environments.
 
 ## Features
 
-- Multi-stage container builds
-- Persistent package caches for Pacman and AUR
-- Flexible configuration via TOML file and command-line arguments
-- Support for custom build contexts and mounts
-- Integration with bootc for system updates
+- Modular Arch-based bootc image construction
+- Seamless bootc upgrade integration with atomic updates
+- Persistent Pacman and AUR package caches
+- Flexible stage-based architecture (base, desktop, apps, etc.)
+- TOML configuration with CLI overrides
+
+## Use Cases
+
+- Immutable Arch Linux desktop systems
+- Server deployments with atomic updates
+- Reproducible development environments
+- Custom Arch-based distributions
 
 ## Installation
 
@@ -63,7 +74,7 @@ trls clean
 
 #### `update`
 
-Shorthand to build rootfs and run bootc upgrade:
+Build rootfs image and perform atomic bootc upgrade (primary workflow):
 
 ```bash
 trls update
@@ -195,20 +206,17 @@ trls build
 trls --rootfs-stages base,custom,final build
 ```
 
-### Development Workflow
+### bootc Workflow
 
 ```bash
-# Build builder container
-trls build-builder
+# Build and deploy new system image
+trls update
 
-# Build development rootfs
-trls --rootfs-stages base,devel build
+# Build custom configuration
+trls --rootfs-stages base,desktop,apps build
 
-# Test the build
+# Test before deployment
 trls run -- /bin/bash
-
-# Clean up
-trls clean
 ```
 
 ## Error Handling
