@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use std::path::PathBuf;
 use std::time::SystemTime;
 use std::fs;
+use std::collections::{HashMap, HashSet};
 
 use crate::config::TrellisConfig;
 use super::{constants::{patterns, errors}, common::TrellisMessaging};
@@ -177,6 +178,104 @@ impl<'a> ContainerfileDiscovery<'a> {
         Ok(found_paths_with_depth[0].0.to_string_lossy().into_owned())
     }
 
+    /// Efficiently discovers multiple containerfiles with early termination.
+    /// 
+    /// This method is optimized for batch discovery operations like validate_stages()
+    /// where we know all required groups upfront. It terminates directory traversal
+    /// early once all required files are found.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `groups` - Set of group names to search for
+    /// 
+    /// # Returns
+    /// 
+    /// A HashMap mapping group names to their discovered paths
+    pub fn find_multiple_containerfiles(&self, groups: &[String]) -> Result<HashMap<String, PathBuf>> {
+        if groups.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let mut found = HashMap::new();
+        let mut remaining: HashSet<String> = groups.iter().cloned().collect();
+        let mut walker_count = 0;
+
+        // Use walkdir for efficient directory traversal
+        let walker = WalkDir::new(&self.config.src_dir)
+            .max_depth(patterns::MAX_SEARCH_DEPTH)
+            .follow_links(false)
+            .into_iter()
+            .filter_map(|entry| {
+                match entry {
+                    Ok(entry) => Some(entry),
+                    Err(err) => {
+                        self.warning(&format!("Error accessing directory: {err}"));
+                        None
+                    }
+                }
+            });
+
+        for entry in walker {
+            walker_count += 1;
+            
+            // Progress reporting for large directory trees
+            if walker_count % 1000 == 0 {
+                self.msg(&format!("Searched {} directories...", walker_count));
+            }
+
+            if entry.file_type().is_file() {
+                if let Some(filename) = entry.file_name().to_str() {
+                    if let Some(group) = self.extract_group_from_filename(filename) {
+                        if remaining.contains(&group) {
+                            let depth = entry.path().components().count();
+                            
+                            // If we already found this group, keep the deeper (more specific) one
+                            match found.get(&group) {
+                                Some((_, existing_depth)) if depth <= *existing_depth => continue,
+                                _ => {}
+                            }
+                            
+                            found.insert(group.clone(), (entry.path().to_path_buf(), depth));
+                            remaining.remove(&group);
+                            
+                            // Early termination when all files are found
+                            if remaining.is_empty() {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Convert to final result format (remove depth information)
+        let result: HashMap<String, PathBuf> = found
+            .into_iter()
+            .map(|(group, (path, _))| (group, path))
+            .collect();
+
+        Ok(result)
+    }
+
+    /// Extracts group name from a containerfile filename.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `filename` - The filename to parse (e.g., "Containerfile.base")
+    /// 
+    /// # Returns
+    /// 
+    /// The group name if the filename matches the containerfile pattern
+    fn extract_group_from_filename(&self, filename: &str) -> Option<String> {
+        if filename.starts_with(patterns::CONTAINERFILE_PREFIX) {
+            let group = &filename[patterns::CONTAINERFILE_PREFIX.len()..];
+            if !group.is_empty() {
+                return Some(group.to_string());
+            }
+        }
+        None
+    }
+
     /// Parses a stage name that may include group syntax (group:stage).
     /// 
     /// # Arguments
@@ -196,6 +295,7 @@ impl<'a> ContainerfileDiscovery<'a> {
     /// Validates that all required containerfiles exist for the given stages.
     /// 
     /// This performs upfront validation to fail fast if any required files are missing.
+    /// Uses batch discovery with early termination for improved performance.
     /// 
     /// # Arguments
     /// 
@@ -205,11 +305,25 @@ impl<'a> ContainerfileDiscovery<'a> {
     /// 
     /// Returns an error if any required containerfile is not found.
     pub fn validate_stages(&self, stages: &[String]) -> Result<()> {
-        let mut missing_files = Vec::new();
+        if stages.is_empty() {
+            return Ok(());
+        }
+
+        // Extract unique group names from stages
+        let groups: Vec<String> = stages
+            .iter()
+            .map(|stage| Self::parse_stage_name(stage).0)
+            .collect::<HashSet<_>>() // Remove duplicates
+            .into_iter()
+            .collect();
+
+        // Use batch discovery for efficiency
+        let found_files = self.find_multiple_containerfiles(&groups)?;
         
-        for stage in stages {
-            let (group, _) = Self::parse_stage_name(stage);
-            if self.find_containerfile(&group).is_err() {
+        // Check for missing files
+        let mut missing_files = Vec::new();
+        for group in &groups {
+            if !found_files.contains_key(group) {
                 missing_files.push(format!("{}{group}", patterns::CONTAINERFILE_PREFIX));
             }
         }
@@ -217,7 +331,7 @@ impl<'a> ContainerfileDiscovery<'a> {
         if !missing_files.is_empty() {
             return Err(anyhow!(
                 "{}: {}",
-            errors::MISSING_CONTAINERFILES,
+                errors::MISSING_CONTAINERFILES,
                 missing_files.join(", ")
             ));
         }
