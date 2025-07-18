@@ -94,7 +94,7 @@ impl<'a> ContainerfileDiscovery<'a> {
     /// # Errors
     /// 
     /// Returns an error if the containerfile is not found or if directory traversal fails.
-    pub fn find_containerfile(&self, group: &str) -> Result<String> {
+    pub fn find_containerfile(&self, group: &str) -> Result<PathBuf> {
         let mut cache = self.cache.borrow_mut();
         
         // Check if cache is still valid
@@ -107,7 +107,7 @@ impl<'a> ContainerfileDiscovery<'a> {
         if let Some(entry) = cache.get(group) {
             // Verify the cached file still exists
             if entry.path.exists() {
-                return Ok(entry.path.to_string_lossy().into_owned());
+                return Ok(entry.path.clone());
             } else {
                 // File was deleted, remove from cache and continue with fresh search
                 cache.cache.pop(group);
@@ -118,16 +118,15 @@ impl<'a> ContainerfileDiscovery<'a> {
         let result = self.find_containerfile_uncached(group);
         
         // Cache the result if successful
-        if let Ok(ref path_str) = result {
-            let path = PathBuf::from(path_str);
-            cache.put(group.to_string(), path);
+        if let Ok(ref path) = result {
+            cache.put(group.to_string(), path.clone());
         }
         
         result
     }
 
     /// Performs uncached containerfile discovery using walkdir.
-    fn find_containerfile_uncached(&self, group: &str) -> Result<String> {
+    fn find_containerfile_uncached(&self, group: &str) -> Result<PathBuf> {
         let filename = format!("{}{group}", patterns::CONTAINERFILE_PREFIX);
         
         // Use walkdir for efficient directory traversal with built-in features:
@@ -174,8 +173,8 @@ impl<'a> ContainerfileDiscovery<'a> {
         // Sort by depth (descending) for most specific match
         found_paths_with_depth.sort_unstable_by_key(|(_, depth)| std::cmp::Reverse(*depth));
         
-        // Return the path as string
-        Ok(found_paths_with_depth[0].0.to_string_lossy().into_owned())
+        // Return the path as PathBuf
+        Ok(found_paths_with_depth[0].0.clone())
     }
 
     /// Efficiently discovers multiple containerfiles with early termination.

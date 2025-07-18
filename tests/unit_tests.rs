@@ -213,7 +213,7 @@ fn test_find_containerfile_in_subdir() {
     let discovery = ContainerfileDiscovery::new(&config);
     
     let result = discovery.find_containerfile("base").unwrap();
-    assert_eq!(result, containerfile_path.to_string_lossy());
+    assert_eq!(result, containerfile_path);
 }
 
 #[test]
@@ -226,7 +226,7 @@ fn test_find_containerfile_in_root() {
     let discovery = ContainerfileDiscovery::new(&config);
     
     let result = discovery.find_containerfile("base").unwrap();
-    assert_eq!(result, containerfile_path.to_string_lossy());
+    assert_eq!(result, containerfile_path);
 }
 
 #[test]
@@ -257,7 +257,7 @@ fn test_find_containerfile_prefers_subdir() {
     let discovery = ContainerfileDiscovery::new(&config);
     
     let result = discovery.find_containerfile("base").unwrap();
-    assert_eq!(result, subdir_containerfile.to_string_lossy());
+    assert_eq!(result, subdir_containerfile);
 }
 
 #[test]
@@ -277,7 +277,7 @@ fn test_find_containerfile_recursive_search() {
     
     // The recursive search should find the deeply nested Containerfile
     let result = discovery.find_containerfile("root").unwrap();
-    assert_eq!(result, containerfile_path.to_string_lossy());
+    assert_eq!(result, containerfile_path);
 }
 
 #[test]
