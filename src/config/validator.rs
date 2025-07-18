@@ -1,29 +1,29 @@
-use anyhow::{anyhow, Result};
-use crate::trellis::constants::errors;
 use super::lib::TrellisConfig;
+use crate::trellis::constants::errors;
+use anyhow::{anyhow, Result};
 
 /// Centralized configuration validator.
-/// 
+///
 /// This module consolidates all configuration validation logic in one place,
 /// providing comprehensive validation with clear error messages.
 pub struct ConfigValidator;
 
 impl ConfigValidator {
     /// Validates a complete TrellisConfig for all potential issues.
-    /// 
+    ///
     /// This performs comprehensive validation including:
     /// - Path validation
     /// - Cross-dependency validation
-    /// 
+    ///
     /// Note: Stage validation is not performed here as empty stages are allowed
     /// during config creation and should only be validated when operations require them.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `config` - The configuration to validate
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if any validation check fails
     pub fn validate_complete(config: &TrellisConfig) -> Result<()> {
         Self::validate_paths(config)?;
@@ -32,14 +32,14 @@ impl ConfigValidator {
     }
 
     /// Validates that stage lists are not empty when they should contain stages.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `stages` - List of stage names to validate
     /// * `stage_type` - Type of stages for error messaging ("builder" or "rootfs")
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if the stage list is empty
     pub fn validate_stages(stages: &[String], stage_type: &str) -> Result<()> {
         if stages.is_empty() {
@@ -54,13 +54,13 @@ impl ConfigValidator {
     }
 
     /// Validates path-related configuration.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `config` - The configuration to validate
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if any path validation fails
     fn validate_paths(config: &TrellisConfig) -> Result<()> {
         // Validate source directory exists
@@ -106,13 +106,13 @@ impl ConfigValidator {
     }
 
     /// Validates cross-dependencies between configuration options.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `config` - The configuration to validate
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if any cross-dependency validation fails
     fn validate_cross_dependencies(config: &TrellisConfig) -> Result<()> {
         // Validate tag names are not empty
@@ -167,7 +167,7 @@ mod tests {
         let (config, _temp_dir) = create_test_config();
         let result = ConfigValidator::validate_complete(&config);
         if let Err(ref e) = result {
-            println!("Validation error: {}", e);
+            println!("Validation error: {e}");
         }
         assert!(result.is_ok());
     }
@@ -196,7 +196,7 @@ mod tests {
     fn test_validate_paths_nonexistent_src_dir() {
         let (mut config, _temp_dir) = create_test_config();
         config.src_dir = PathBuf::from("/nonexistent/path");
-        
+
         let result = ConfigValidator::validate_paths(&config);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("does not exist"));
@@ -207,21 +207,22 @@ mod tests {
         let (mut config, _temp_dir) = create_test_config();
         config.builder_tag = "same-tag".to_string();
         config.rootfs_tag = "same-tag".to_string();
-        
+
         let result = ConfigValidator::validate_cross_dependencies(&config);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("must be different"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("must be different"));
     }
 
     #[test]
     fn test_validate_cross_dependencies_empty_tag() {
         let (mut config, _temp_dir) = create_test_config();
         config.builder_tag = "".to_string();
-        
+
         let result = ConfigValidator::validate_cross_dependencies(&config);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("cannot be empty"));
     }
-
-
 }

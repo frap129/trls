@@ -1,12 +1,12 @@
-use std::{env, fs, process::Command};
 use anyhow::{anyhow, Context, Result};
+use std::{env, fs, process::Command};
 
-use crate::config::TrellisConfig;
 use super::{
+    common::{PodmanContext, TrellisMessaging},
+    constants::{commands, env_vars, errors},
     discovery::ContainerfileDiscovery,
-    common::{TrellisMessaging, PodmanContext},
-    constants::{env_vars, commands, errors},
 };
+use crate::config::TrellisConfig;
 
 /// Type of container build operation.
 #[derive(Debug, Clone, Copy)]
@@ -44,6 +44,12 @@ impl Drop for ScopedEnvVar {
 /// Builder for constructing podman commands with type safety.
 pub struct PodmanCommandBuilder {
     cmd: Command,
+}
+
+impl Default for PodmanCommandBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PodmanCommandBuilder {
@@ -121,9 +127,7 @@ impl PodmanCommandBuilder {
     }
 
     pub fn execute(mut self) -> Result<()> {
-        let status = self.cmd
-            .status()
-            .podman_context("build")?;
+        let status = self.cmd.status().podman_context("build")?;
 
         if status.success() {
             Ok(())
@@ -133,11 +137,11 @@ impl PodmanCommandBuilder {
                 .arg(commands::VERSION_SUBCMD)
                 .output()
                 .podman_context("version check")?;
-            
+
             if !output.status.success() {
                 return Err(anyhow!(errors::PODMAN_NOT_AVAILABLE));
             }
-            
+
             Err(anyhow!("Podman build failed with exit code: {:?}. Check podman logs for details. Ensure sufficient disk space and proper permissions.", status.code()))
         }
     }
@@ -161,7 +165,12 @@ impl<'a> ContainerBuilder<'a> {
 
     /// Determines the base image for a given stage in the build process.
     /// This method is primarily for testing the base image selection logic.
-    pub fn determine_base_image(&self, _stage_index: usize, build_type: BuildType, last_stage: &str) -> String {
+    pub fn determine_base_image(
+        &self,
+        _stage_index: usize,
+        build_type: BuildType,
+        last_stage: &str,
+    ) -> String {
         if last_stage.is_empty() {
             match build_type {
                 BuildType::Rootfs => self.config.rootfs_base.clone(),
@@ -202,9 +211,14 @@ impl<'a> ContainerBuilder<'a> {
             };
 
             let containerfile_path = self.discovery.find_containerfile(&group)?;
-            
-            self.msg(&format!("Building stage {}/{}: {} -> {}", 
-                i + 1, build_stages.len(), build_stage, tag));
+
+            self.msg(&format!(
+                "Building stage {}/{}: {} -> {}",
+                i + 1,
+                build_stages.len(),
+                build_stage,
+                tag
+            ));
 
             // For the first stage, use rootfs_base as BASE_IMAGE; for subsequent stages, use the previous stage
             let base_image = self.determine_base_image(i, build_type, &last_stage);
@@ -221,9 +235,10 @@ impl<'a> ContainerBuilder<'a> {
                 builder = self.add_rootfs_config(builder)?;
             }
 
-            builder.execute()
+            builder
+                .execute()
                 .with_context(|| format!("Failed to build stage: {build_stage}"))?;
-                
+
             last_stage = tag;
         }
 
@@ -238,8 +253,18 @@ impl<'a> ContainerBuilder<'a> {
         }
 
         // Add cache directories
-        builder = self.add_cache_mount(builder, &self.config.pacman_cache, "pacman", "/var/cache/pacman/pkg")?;
-        builder = self.add_cache_mount(builder, &self.config.aur_cache, "AUR", "/var/cache/trellis/aur")?;
+        builder = self.add_cache_mount(
+            builder,
+            &self.config.pacman_cache,
+            "pacman",
+            "/var/cache/pacman/pkg",
+        )?;
+        builder = self.add_cache_mount(
+            builder,
+            &self.config.aur_cache,
+            "AUR",
+            "/var/cache/trellis/aur",
+        )?;
 
         // Add hooks directory
         if let Some(hooks_dir) = &self.config.hooks_dir {
@@ -269,11 +294,10 @@ impl<'a> ContainerBuilder<'a> {
         if let Some(cache_dir) = cache_path {
             // Try to create the cache directory
             if let Err(e) = fs::create_dir_all(cache_dir) {
-                let error_msg = format!(
-                    "Failed to create {cache_name} cache directory: {cache_dir:?} - {e}"
-                );
+                let error_msg =
+                    format!("Failed to create {cache_name} cache directory: {cache_dir:?} - {e}");
                 self.warning(&error_msg);
-                
+
                 // Categorize the error for better user feedback
                 if e.kind() == std::io::ErrorKind::PermissionDenied {
                     return Err(anyhow!(
@@ -288,20 +312,21 @@ impl<'a> ContainerBuilder<'a> {
             match cache_dir.metadata() {
                 Ok(metadata) => {
                     if metadata.permissions().readonly() {
-                        let error_msg = format!(
-                            "{cache_name} cache directory is read-only: {cache_dir:?}"
-                        );
+                        let error_msg =
+                            format!("{cache_name} cache directory is read-only: {cache_dir:?}");
                         self.warning(&error_msg);
                         return Err(anyhow!("{error_msg}"));
                     }
-                    
+
                     builder = builder.volume(&format!("{}:{container_path}", cache_dir.display()));
-                    self.msg(&format!("Using {cache_name} cache: {}", cache_dir.display()));
+                    self.msg(&format!(
+                        "Using {cache_name} cache: {}",
+                        cache_dir.display()
+                    ));
                 }
                 Err(e) => {
-                    let error_msg = format!(
-                        "Cannot access {cache_name} cache directory: {cache_dir:?} - {e}"
-                    );
+                    let error_msg =
+                        format!("Cannot access {cache_name} cache directory: {cache_dir:?} - {e}");
                     self.warning(&error_msg);
                     return Err(anyhow!("{error_msg}"));
                 }
@@ -310,5 +335,3 @@ impl<'a> ContainerBuilder<'a> {
         Ok(builder)
     }
 }
-
-

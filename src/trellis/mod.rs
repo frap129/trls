@@ -1,5 +1,5 @@
 //! Trellis core functionality modules.
-//! 
+//!
 //! This module contains the main application logic split into focused components:
 //! - `builder`: Container building operations
 //! - `cleaner`: Image cleanup and management
@@ -10,17 +10,17 @@ use anyhow::Result;
 
 use crate::{
     cli::{Cli, Commands},
-    config::{TrellisConfig, ConfigValidator},
+    config::{ConfigValidator, TrellisConfig},
 };
 
 use common::TrellisMessaging;
 
 pub mod builder;
 pub mod cleaner;
-pub mod runner;
-pub mod discovery;
 pub mod common;
 pub mod constants;
+pub mod discovery;
+pub mod runner;
 
 pub use builder::ContainerBuilder;
 pub use cleaner::ImageCleaner;
@@ -36,13 +36,13 @@ impl TrellisApp {
     pub fn new(cli: Cli) -> Result<Self> {
         let command = cli.command.clone();
         let config = TrellisConfig::new(cli)?;
-        
+
         Ok(TrellisApp { config, command })
     }
 
     pub fn run(&self) -> Result<()> {
         let trellis = Trellis::new(&self.config);
-        
+
         match &self.command {
             Commands::BuildBuilder => trellis.build_builder_container(),
             Commands::Build => trellis.build_rootfs_container(),
@@ -84,10 +84,10 @@ impl<'a> Trellis<'a> {
         )?;
 
         self.msg("Builder container built successfully");
-        
+
         // Auto-clean intermediate images if enabled
         self.cleaner.auto_clean()?;
-        
+
         Ok(())
     }
 
@@ -102,10 +102,10 @@ impl<'a> Trellis<'a> {
         )?;
 
         self.msg("Rootfs container built successfully");
-        
+
         // Auto-clean intermediate images if enabled
         self.cleaner.auto_clean()?;
-        
+
         Ok(())
     }
 

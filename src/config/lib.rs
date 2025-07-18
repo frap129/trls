@@ -5,13 +5,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     cli::Cli,
-    trellis::constants::{containers, paths, env_vars},
+    trellis::constants::{containers, env_vars, paths},
 };
 
-use super::merger::{ConfigMerger, BoolMerger};
+use super::merger::{BoolMerger, ConfigMerger};
 use super::validator::ConfigValidator;
-
-
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
@@ -83,19 +81,19 @@ pub struct TrellisConfig {
 
 impl TrellisConfig {
     /// Creates a new TrellisConfig by merging CLI arguments with configuration file values.
-    /// 
+    ///
     /// CLI arguments take precedence over configuration file values, which take precedence
     /// over default values. The configuration file path can be overridden with the
     /// `TRELLIS_CONFIG` environment variable.
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if the configuration file exists but cannot be read or parsed.
     pub fn new(cli: Cli) -> Result<Self> {
         let config_file = env::var(env_vars::CONFIG_PATH)
             .map(PathBuf::from)
             .unwrap_or_else(|_| PathBuf::from(paths::DEFAULT_CONFIG_PATH));
-            
+
         let file_config = if config_file.exists() {
             let content = fs::read_to_string(&config_file)
                 .with_context(|| format!("Failed to read config file: {config_file:?}"))?;
@@ -105,8 +103,6 @@ impl TrellisConfig {
             Config::default()
         };
 
-
-
         let build_config = file_config.build.as_ref();
         let env_config = file_config.environment.as_ref();
 
@@ -114,56 +110,56 @@ impl TrellisConfig {
             builder_stages: Vec::merge(
                 cli.builder_stages,
                 Self::get_build_field(build_config, |b| &b.builder_stages),
-                Vec::new()
+                Vec::new(),
             ),
             rootfs_stages: Vec::merge(
                 cli.rootfs_stages,
                 Self::get_build_field(build_config, |b| &b.rootfs_stages),
-                Vec::new()
+                Vec::new(),
             ),
             rootfs_base: String::merge(
                 cli.rootfs_base,
                 Self::get_build_field(build_config, |b| &b.rootfs_base),
-                "scratch".to_string()
+                "scratch".to_string(),
             ),
             extra_contexts: Vec::merge(
                 cli.extra_contexts,
                 Self::get_build_field(build_config, |b| &b.extra_contexts),
-                Vec::new()
+                Vec::new(),
             ),
             extra_mounts: Vec::merge(
                 cli.extra_mounts,
                 Self::get_build_field(build_config, |b| &b.extra_mounts),
-                Vec::new()
+                Vec::new(),
             ),
             builder_tag: String::merge(
                 cli.builder_tag,
                 Self::get_build_field(build_config, |b| &b.builder_tag),
-                containers::DEFAULT_BUILDER_TAG.to_string()
+                containers::DEFAULT_BUILDER_TAG.to_string(),
             ),
             rootfs_tag: String::merge(
                 cli.rootfs_tag,
                 Self::get_build_field(build_config, |b| &b.rootfs_tag),
-                containers::DEFAULT_ROOTFS_TAG.to_string()
+                containers::DEFAULT_ROOTFS_TAG.to_string(),
             ),
             podman_build_cache: BoolMerger::merge(
                 cli.podman_build_cache,
                 build_config.and_then(|b| b.podman_build_cache),
-                false
+                false,
             ),
-            auto_clean: cli.auto_clean
-                || build_config.and_then(|b| b.auto_clean).unwrap_or(false),
+            auto_clean: cli.auto_clean || build_config.and_then(|b| b.auto_clean).unwrap_or(false),
             pacman_cache: Option::merge(
                 cli.pacman_cache,
                 Some(Self::get_env_field(env_config, |e| &e.pacman_cache)),
-                None
+                None,
             ),
             aur_cache: Option::merge(
                 cli.aur_cache,
                 Some(Self::get_env_field(env_config, |e| &e.aur_cache)),
-                None
+                None,
             ),
-            src_dir: cli.src_dir
+            src_dir: cli
+                .src_dir
                 .or_else(|| env_config.and_then(|e| e.src_dir.clone()))
                 .unwrap_or_else(|| PathBuf::from(paths::DEFAULT_SRC_DIR)),
             hooks_dir: Self::resolve_hooks_dir(env_config),
@@ -171,12 +167,10 @@ impl TrellisConfig {
 
         // Validate the complete configuration
         ConfigValidator::validate_complete(&config)?;
-        
+
         Ok(config)
     }
-    
 
-    
     /// Resolves the hooks directory with proper existence checking.
     fn resolve_hooks_dir(env_config: Option<&EnvironmentConfig>) -> Option<PathBuf> {
         let hooks_dir = env_config
@@ -188,7 +182,7 @@ impl TrellisConfig {
     /// Helper function to consolidate build config field access patterns.
     fn get_build_field<T: Clone>(
         build_config: Option<&BuildConfig>,
-        field_getter: fn(&BuildConfig) -> &Option<T>
+        field_getter: fn(&BuildConfig) -> &Option<T>,
     ) -> Option<T> {
         build_config.and_then(|b| field_getter(b).clone())
     }
@@ -196,10 +190,8 @@ impl TrellisConfig {
     /// Helper function to consolidate environment config field access patterns.
     fn get_env_field<T: Clone>(
         env_config: Option<&EnvironmentConfig>,
-        field_getter: fn(&EnvironmentConfig) -> &Option<T>
+        field_getter: fn(&EnvironmentConfig) -> &Option<T>,
     ) -> Option<T> {
         env_config.and_then(|e| field_getter(e).clone())
     }
-
 }
-

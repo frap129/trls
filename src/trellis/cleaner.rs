@@ -1,11 +1,11 @@
-use std::process::Command;
 use anyhow::{anyhow, Context, Result};
+use std::process::Command;
 
-use crate::config::TrellisConfig;
 use super::{
     common::TrellisMessaging,
-    constants::{containers, commands},
+    constants::{commands, containers},
 };
+use crate::config::TrellisConfig;
 
 /// Mode for cleaning container images.
 #[derive(Debug, Clone, Copy)]
@@ -31,15 +31,17 @@ impl<'a> ImageCleaner<'a> {
     /// Removes all trellis-generated container images.
     pub fn clean_all(&self) -> Result<()> {
         self.msg("Cleaning trls-generated images...");
-        
+
         let removed_count = self.clean_images(CleanMode::Full)?;
-        
+
         if removed_count == 0 {
             self.msg("No trls-generated images found to clean");
         } else {
-            self.msg(&format!("Cleanup completed - removed {} images", removed_count));
+            self.msg(&format!(
+                "Cleanup completed - removed {removed_count} images"
+            ));
         }
-        
+
         Ok(())
     }
 
@@ -48,13 +50,15 @@ impl<'a> ImageCleaner<'a> {
         if !self.config.auto_clean {
             return Ok(());
         }
-        
+
         let removed_count = self.clean_images(CleanMode::Auto)?;
-        
+
         if removed_count > 0 {
-            self.msg(&format!("Auto-cleanup removed {} intermediate images", removed_count));
+            self.msg(&format!(
+                "Auto-cleanup removed {removed_count} intermediate images"
+            ));
         }
-        
+
         Ok(())
     }
 
@@ -64,61 +68,95 @@ impl<'a> ImageCleaner<'a> {
             CleanMode::Full => "all trls-generated",
             CleanMode::Auto => "intermediate trls-generated",
         };
-        
+
         let output = Command::new(commands::PODMAN_CMD)
-            .args([commands::IMAGES_SUBCMD, "--format", "{{.Repository}}:{{.Tag}}"])
+            .args([
+                commands::IMAGES_SUBCMD,
+                "--format",
+                "{{.Repository}}:{{.Tag}}",
+            ])
             .output()
             .context("Failed to list podman images")?;
-        
+
         if !output.status.success() {
-            return Err(anyhow!("Failed to list images: {}", 
-                String::from_utf8_lossy(&output.stderr)));
+            return Err(anyhow!(
+                "Failed to list images: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
         }
-        
+
         // Pre-compute expected image names once for efficiency
-        let expected_builder = format!("{}{}:latest", containers::LOCALHOST_PREFIX, self.config.builder_tag);
-        let expected_rootfs = format!("{}{}:latest", containers::LOCALHOST_PREFIX, self.config.rootfs_tag);
-        
+        let expected_builder = format!(
+            "{}{}:latest",
+            containers::LOCALHOST_PREFIX,
+            self.config.builder_tag
+        );
+        let expected_rootfs = format!(
+            "{}{}:latest",
+            containers::LOCALHOST_PREFIX,
+            self.config.rootfs_tag
+        );
+
         let image_list = String::from_utf8_lossy(&output.stdout);
-        
+
         // Optimized filtering: process images and collect those to remove in one pass
         let images_to_remove: Vec<&str> = image_list
             .lines()
             .filter_map(|line| {
                 let line = line.trim();
-                if !line.is_empty() && self.should_remove_image(line, mode, &expected_builder, &expected_rootfs) {
+                if !line.is_empty()
+                    && self.should_remove_image(line, mode, &expected_builder, &expected_rootfs)
+                {
                     Some(line)
                 } else {
                     None
                 }
             })
             .collect();
-        
+
         if images_to_remove.is_empty() {
             return Ok(0);
         }
-        
-        self.msg(&format!("Found {} {} images to remove", images_to_remove.len(), mode_desc));
-        
+
+        self.msg(&format!(
+            "Found {} {} images to remove",
+            images_to_remove.len(),
+            mode_desc
+        ));
+
         // Use optimized batch removal
         self.remove_images_batch(&images_to_remove)
     }
 
     /// Determines whether an image should be removed based on the cleanup mode.
-    fn should_remove_image(&self, image: &str, mode: CleanMode, expected_builder: &str, expected_rootfs: &str) -> bool {
+    fn should_remove_image(
+        &self,
+        image: &str,
+        mode: CleanMode,
+        expected_builder: &str,
+        expected_rootfs: &str,
+    ) -> bool {
         // Check if this is a trellis-generated image
-        let builder_prefix = format!("{}{}", containers::LOCALHOST_PREFIX, containers::BUILDER_PREFIX);
-        let stage_prefix = format!("{}{}", containers::LOCALHOST_PREFIX, containers::STAGE_PREFIX);
-        
-        let is_trellis = image.starts_with(&builder_prefix) 
+        let builder_prefix = format!(
+            "{}{}",
+            containers::LOCALHOST_PREFIX,
+            containers::BUILDER_PREFIX
+        );
+        let stage_prefix = format!(
+            "{}{}",
+            containers::LOCALHOST_PREFIX,
+            containers::STAGE_PREFIX
+        );
+
+        let is_trellis = image.starts_with(&builder_prefix)
             || image.starts_with(&stage_prefix)
-            || image == expected_builder 
+            || image == expected_builder
             || image == expected_rootfs;
-        
+
         if !is_trellis {
             return false;
         }
-        
+
         match mode {
             CleanMode::Full => true, // Remove all trellis images
             CleanMode::Auto => {
@@ -138,7 +176,7 @@ impl<'a> ImageCleaner<'a> {
         let mut cmd = Command::new(commands::PODMAN_CMD);
         cmd.args([commands::RMI_SUBCMD, "-f"]);
         cmd.args(images);
-        
+
         match cmd.output() {
             Ok(output) if output.status.success() => {
                 self.msg(&format!("Batch removed {} images", images.len()));
@@ -149,7 +187,7 @@ impl<'a> ImageCleaner<'a> {
                 let stderr = String::from_utf8_lossy(&output.stderr);
                 self.msg(&format!("Batch removal failed: {stderr}"));
                 self.msg("Trying individual removal...");
-                
+
                 let mut removed_count = 0;
                 for image in images {
                     removed_count += self.remove_single_image(image)?;
@@ -160,7 +198,7 @@ impl<'a> ImageCleaner<'a> {
                 // Command execution failed
                 self.warning(&format!("Failed to execute batch removal: {e}"));
                 self.msg("Trying individual removal...");
-                
+
                 let mut removed_count = 0;
                 for image in images {
                     removed_count += self.remove_single_image(image)?;
@@ -176,15 +214,14 @@ impl<'a> ImageCleaner<'a> {
             .args([commands::RMI_SUBCMD, "-f", image])
             .output()
             .context("Failed to remove image")?;
-            
+
         if output.status.success() {
-            self.msg(&format!("Removed image: {}", image));
+            self.msg(&format!("Removed image: {image}"));
             Ok(1)
         } else {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            self.warning(&format!("Failed to remove image {}: {}", image, stderr));
+            self.warning(&format!("Failed to remove image {image}: {stderr}"));
             Ok(0)
         }
     }
-
 }

@@ -1,11 +1,11 @@
-use std::process::Command;
 use anyhow::{anyhow, Context, Result};
+use std::process::Command;
 
-use crate::config::TrellisConfig;
 use super::{
-    common::{TrellisMessaging, PodmanContext},
-    constants::{containers, commands},
+    common::{PodmanContext, TrellisMessaging},
+    constants::{commands, containers},
 };
+use crate::config::TrellisConfig;
 
 /// Container capabilities enum for type safety.
 #[derive(Debug, Clone, Copy)]
@@ -24,6 +24,12 @@ impl ContainerCapability {
 /// Builder for constructing podman run commands.
 pub struct PodmanRunCommandBuilder {
     cmd: Command,
+}
+
+impl Default for PodmanRunCommandBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PodmanRunCommandBuilder {
@@ -64,27 +70,30 @@ impl PodmanRunCommandBuilder {
     }
 
     pub fn execute(mut self) -> Result<()> {
-        let status = self.cmd
+        let status = self
+            .cmd
             .status()
             .context("Failed to execute podman run command")?;
 
         if status.success() {
             Ok(())
         } else {
-            Err(anyhow!("Podman run failed with exit code: {:?}", status.code()))
+            Err(anyhow!(
+                "Podman run failed with exit code: {:?}",
+                status.code()
+            ))
         }
     }
 }
 
 /// Handles container execution operations.
-pub struct ContainerRunner {
-}
+pub struct ContainerRunner {}
 
 impl TrellisMessaging for ContainerRunner {}
 
 impl ContainerRunner {
     pub fn new(_config: &TrellisConfig) -> Self {
-        Self { }
+        Self {}
     }
 
     /// Runs a container with the specified tag and arguments.
@@ -104,7 +113,7 @@ impl ContainerRunner {
     /// Runs bootc upgrade with proper error handling.
     pub fn run_bootc_upgrade(&self) -> Result<()> {
         self.msg("Running bootc upgrade...");
-        
+
         // Check if bootc is available
         self.validate_bootc_available()?;
 
@@ -141,17 +150,17 @@ impl ContainerRunner {
 
     /// Validates that bootc is available and working.
     fn validate_bootc_available(&self) -> Result<()> {
-        let output = Command::new("bootc")
-            .arg("--version")
-            .output();
+        let output = Command::new("bootc").arg("--version").output();
 
         match output {
             Ok(output) if output.status.success() => Ok(()),
             Ok(_) => Err(anyhow!("bootc is available but not responding correctly")),
             Err(_) => {
                 // Try to provide helpful guidance
-                if let Ok(_) = which::which("bootc") {
-                    Err(anyhow!("bootc found but not executable. Check permissions."))
+                if which::which("bootc").is_ok() {
+                    Err(anyhow!(
+                        "bootc found but not executable. Check permissions."
+                    ))
                 } else {
                     Err(anyhow!(
                         "bootc not found. Please install bootc to use the update command."
@@ -160,5 +169,4 @@ impl ContainerRunner {
             }
         }
     }
-
 }

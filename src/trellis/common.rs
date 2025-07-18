@@ -6,16 +6,16 @@ use anyhow::Context;
 mod messages {
     /// Error message prefix
     pub const ERROR_PREFIX: &str = "====> ERROR: ";
-    
+
     /// Warning message prefix
     pub const WARNING_PREFIX: &str = "====> WARNING: ";
-    
+
     /// Info message prefix
     pub const INFO_PREFIX: &str = "====> ";
 }
 
 /// Trait providing consistent messaging functionality across all trellis components.
-/// 
+///
 /// This trait standardizes the output format for information, warning, and error messages,
 /// ensuring consistent user experience across the application.
 pub trait TrellisMessaging {
@@ -23,17 +23,17 @@ pub trait TrellisMessaging {
     fn msg(&self, message: &str) {
         println!("{}{message}", messages::INFO_PREFIX);
     }
-    
+
     /// Displays a warning message with the standard trellis warning prefix.
     fn warning(&self, message: &str) {
         eprintln!("{}{message}", messages::WARNING_PREFIX);
     }
-    
+
     /// Displays an error message with the standard trellis error prefix.
     fn error(&self, message: &str) {
         eprintln!("{}{message}", messages::ERROR_PREFIX);
     }
-    
+
     /// Displays a prompt message without a newline for user input
     fn prompt(&self, message: &str) {
         eprint!("{}{message}", messages::INFO_PREFIX);
@@ -48,6 +48,12 @@ pub struct TrellisMessager;
 
 impl TrellisMessaging for TrellisMessager {}
 
+impl Default for TrellisMessager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TrellisMessager {
     pub fn new() -> Self {
         Self
@@ -55,7 +61,7 @@ impl TrellisMessager {
 }
 
 /// Extension trait for adding podman-specific error context to Results.
-/// 
+///
 /// This trait provides convenient methods for adding consistent error context
 /// to podman command operations throughout the codebase.
 pub trait PodmanContext<T> {

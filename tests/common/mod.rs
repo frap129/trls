@@ -10,7 +10,7 @@ RUN echo "Building stage: {stage}"
 LABEL stage="{stage}"
 "#
         );
-        
+
         let containerfile_path = temp_dir.path().join(format!("Containerfile.{stage}"));
         fs::write(containerfile_path, containerfile_content).unwrap();
     }
@@ -22,14 +22,14 @@ pub fn setup_nested_containerfiles(temp_dir: &TempDir, groups_and_stages: &[(&st
     for (group, stage) in groups_and_stages {
         let group_dir = temp_dir.path().join(group);
         fs::create_dir_all(&group_dir).unwrap();
-        
+
         let containerfile_content = format!(
             r#"FROM alpine
 RUN echo "Building group: {group} stage: {stage}"
 LABEL group="{group}" stage="{stage}"
 "#
         );
-        
+
         let containerfile_path = group_dir.join(format!("Containerfile.{stage}"));
         fs::write(containerfile_path, containerfile_content).unwrap();
     }
@@ -50,7 +50,7 @@ podman_build_cache = true
 pacman_cache = "/tmp/test-pacman"
 aur_cache = "/tmp/test-aur"
 "#;
-    
+
     let config_path = temp_dir.path().join(config_name);
     fs::write(&config_path, config_content).unwrap();
     config_path
@@ -61,14 +61,14 @@ aur_cache = "/tmp/test-aur"
 pub fn create_test_hooks_dir(temp_dir: &TempDir) -> std::path::PathBuf {
     let hooks_dir = temp_dir.path().join("hooks.d");
     fs::create_dir_all(&hooks_dir).unwrap();
-    
+
     let hook_content = r#"#!/bin/bash
 echo "Test hook executed"
 "#;
-    
+
     let hook_path = hooks_dir.join("test-hook.sh");
     fs::write(&hook_path, hook_content).unwrap();
-    
+
     // Make the hook executable (on Unix systems)
     #[cfg(unix)]
     {
@@ -77,7 +77,7 @@ echo "Test hook executed"
         perms.set_mode(0o755);
         fs::set_permissions(&hook_path, perms).unwrap();
     }
-    
+
     hooks_dir
 }
 
