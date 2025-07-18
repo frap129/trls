@@ -5,7 +5,7 @@ use crate::trellis::constants::containers;
 
 #[derive(Parser)]
 #[command(name = "trellis")]
-#[command(about = "Modular Arch-based bootc image builder")]
+#[command(about = "A container build system for multi-stage builds")]
 #[command(long_about = None)]
 pub struct Cli {
     #[command(subcommand)]

@@ -1,25 +1,90 @@
 use anyhow::{anyhow, Result};
 use walkdir::WalkDir;
+use lru::LruCache;
+use std::cell::RefCell;
+use std::path::PathBuf;
+use std::time::SystemTime;
+use std::fs;
 
 use crate::config::TrellisConfig;
 use super::{constants::{patterns, errors}, common::TrellisMessaging};
 
+/// Cache entry for containerfile discovery results
+struct ContainerfileCacheEntry {
+    path: PathBuf,
+    discovery_time: SystemTime,
+}
+
+/// LRU cache for containerfile discovery with directory modification time tracking
+struct ContainerfileCache {
+    cache: LruCache<String, ContainerfileCacheEntry>,
+    src_dir_mtime: Option<SystemTime>,
+}
+
+impl ContainerfileCache {
+    fn new() -> Self {
+        Self {
+            cache: LruCache::new(std::num::NonZeroUsize::new(100).unwrap()),
+            src_dir_mtime: None,
+        }
+    }
+
+    fn is_valid(&self, src_dir: &PathBuf) -> bool {
+        if let Ok(metadata) = fs::metadata(src_dir) {
+            if let Ok(current_mtime) = metadata.modified() {
+                return self.src_dir_mtime.map_or(false, |cached_mtime| cached_mtime >= current_mtime);
+            }
+        }
+        false
+    }
+
+    fn update_src_dir_mtime(&mut self, src_dir: &PathBuf) {
+        if let Ok(metadata) = fs::metadata(src_dir) {
+            if let Ok(mtime) = metadata.modified() {
+                self.src_dir_mtime = Some(mtime);
+            }
+        }
+    }
+
+    fn get(&mut self, group: &str) -> Option<&ContainerfileCacheEntry> {
+        self.cache.get(group)
+    }
+
+    fn put(&mut self, group: String, path: PathBuf) {
+        let entry = ContainerfileCacheEntry {
+            path,
+            discovery_time: SystemTime::now(),
+        };
+        self.cache.put(group, entry);
+    }
+
+    fn invalidate(&mut self) {
+        self.cache.clear();
+        self.src_dir_mtime = None;
+    }
+}
+
 /// Handles discovery of Containerfiles in the source directory.
 pub struct ContainerfileDiscovery<'a> {
     config: &'a TrellisConfig,
+    cache: RefCell<ContainerfileCache>,
 }
 
 impl<'a> TrellisMessaging for ContainerfileDiscovery<'a> {}
 
 impl<'a> ContainerfileDiscovery<'a> {
     pub fn new(config: &'a TrellisConfig) -> Self {
-        Self { config }
+        Self { 
+            config,
+            cache: RefCell::new(ContainerfileCache::new()),
+        }
     }
 
     /// Efficiently searches for a Containerfile with the specified group name using walkdir.
     /// 
-    /// This replaces the original recursive implementation with a more efficient approach
-    /// that uses the walkdir crate for better performance and built-in cycle detection.
+    /// This implementation includes an LRU cache to avoid repeated directory traversals
+    /// for the same group names. The cache is invalidated when the source directory
+    /// modification time changes.
     /// 
     /// # Arguments
     /// 
@@ -29,6 +94,39 @@ impl<'a> ContainerfileDiscovery<'a> {
     /// 
     /// Returns an error if the containerfile is not found or if directory traversal fails.
     pub fn find_containerfile(&self, group: &str) -> Result<String> {
+        let mut cache = self.cache.borrow_mut();
+        
+        // Check if cache is still valid
+        if !cache.is_valid(&self.config.src_dir) {
+            cache.invalidate();
+            cache.update_src_dir_mtime(&self.config.src_dir);
+        }
+        
+        // Check cache first
+        if let Some(entry) = cache.get(group) {
+            // Verify the cached file still exists
+            if entry.path.exists() {
+                return Ok(entry.path.to_string_lossy().into_owned());
+            } else {
+                // File was deleted, remove from cache and continue with fresh search
+                cache.cache.pop(group);
+            }
+        }
+        
+        // Cache miss or invalid entry - perform filesystem search
+        let result = self.find_containerfile_uncached(group);
+        
+        // Cache the result if successful
+        if let Ok(ref path_str) = result {
+            let path = PathBuf::from(path_str);
+            cache.put(group.to_string(), path);
+        }
+        
+        result
+    }
+
+    /// Performs uncached containerfile discovery using walkdir.
+    fn find_containerfile_uncached(&self, group: &str) -> Result<String> {
         let filename = format!("{}{group}", patterns::CONTAINERFILE_PREFIX);
         
         // Use walkdir for efficient directory traversal with built-in features:
