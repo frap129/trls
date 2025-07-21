@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tempfile::TempDir;
 
 use crate::common::mocks::{CommandExecutor, MockCommandExecutor};
@@ -76,6 +76,54 @@ impl IsolatedEnvironment {
 impl Default for IsolatedEnvironment {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Global mutex to serialize tests that manipulate TRELLIS_CONFIG environment variable.
+/// This prevents race conditions during concurrent test execution under code coverage tools.
+static CONFIG_ENV_LOCK: Mutex<()> = Mutex::new(());
+
+/// RAII guard for serializing access to TRELLIS_CONFIG environment variable.
+/// 
+/// This ensures that only one test can manipulate the TRELLIS_CONFIG environment
+/// variable at a time, preventing race conditions during concurrent test execution.
+pub struct ConfigEnvGuard {
+    _guard: std::sync::MutexGuard<'static, ()>,
+    original_value: Option<String>,
+}
+
+impl ConfigEnvGuard {
+    /// Acquire exclusive access to TRELLIS_CONFIG environment variable.
+    /// 
+    /// This will block until no other test is manipulating the config environment.
+    pub fn acquire() -> Self {
+        let guard = CONFIG_ENV_LOCK.lock().expect("Config env lock poisoned");
+        let original_value = env::var("TRELLIS_CONFIG").ok();
+        
+        Self {
+            _guard: guard,
+            original_value,
+        }
+    }
+    
+    /// Set TRELLIS_CONFIG to a specific value.
+    pub fn set_config_path(&self, path: &str) {
+        env::set_var("TRELLIS_CONFIG", path);
+    }
+    
+    /// Remove TRELLIS_CONFIG environment variable.
+    pub fn remove_config_env(&self) {
+        env::remove_var("TRELLIS_CONFIG");
+    }
+}
+
+impl Drop for ConfigEnvGuard {
+    fn drop(&mut self) {
+        // Restore original TRELLIS_CONFIG value
+        match &self.original_value {
+            Some(value) => env::set_var("TRELLIS_CONFIG", value),
+            None => env::remove_var("TRELLIS_CONFIG"),
+        }
     }
 }
 

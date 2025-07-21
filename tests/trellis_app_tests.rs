@@ -122,26 +122,14 @@ fn test_update_command_execution() {
 
 #[test]
 fn test_build_with_empty_stages_fails() {
-    // Save original environment variable
-    let original_config = std::env::var("TRELLIS_CONFIG").ok();
-
-    // Ensure cleanup happens even if test panics
-    struct EnvCleanup(Option<String>);
-    impl Drop for EnvCleanup {
-        fn drop(&mut self) {
-            match &self.0 {
-                Some(val) => std::env::set_var("TRELLIS_CONFIG", val),
-                None => std::env::remove_var("TRELLIS_CONFIG"),
-            }
-        }
-    }
-    let _cleanup = EnvCleanup(original_config);
+    // Use configuration environment guard to prevent race conditions with other tests
+    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
 
     // Create temporary empty config file to override system config
     let temp_config_dir = tempfile::TempDir::new().unwrap();
     let temp_config_path = temp_config_dir.path().join("trellis.toml");
     std::fs::write(&temp_config_path, "# Empty test config").unwrap();
-    std::env::set_var("TRELLIS_CONFIG", &temp_config_path);
+    _config_guard.set_config_path(&temp_config_path.to_string_lossy());
 
     let temp_dir = TempDir::new().unwrap();
 
@@ -162,26 +150,14 @@ fn test_build_with_empty_stages_fails() {
 
 #[test]
 fn test_build_builder_with_empty_stages_fails() {
-    // Save original environment variable
-    let original_config = std::env::var("TRELLIS_CONFIG").ok();
-
-    // Ensure cleanup happens even if test panics
-    struct EnvCleanup(Option<String>);
-    impl Drop for EnvCleanup {
-        fn drop(&mut self) {
-            match &self.0 {
-                Some(val) => std::env::set_var("TRELLIS_CONFIG", val),
-                None => std::env::remove_var("TRELLIS_CONFIG"),
-            }
-        }
-    }
-    let _cleanup = EnvCleanup(original_config);
+    // Use configuration environment guard to prevent race conditions with other tests
+    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
 
     // Create temporary empty config file to override system config
     let temp_config_dir = tempfile::TempDir::new().unwrap();
     let temp_config_path = temp_config_dir.path().join("trellis.toml");
     std::fs::write(&temp_config_path, "# Empty test config").unwrap();
-    std::env::set_var("TRELLIS_CONFIG", &temp_config_path);
+    _config_guard.set_config_path(&temp_config_path.to_string_lossy());
 
     let temp_dir = TempDir::new().unwrap();
 
@@ -217,26 +193,14 @@ fn test_build_with_command_failure() {
 
 #[test]
 fn test_build_with_missing_containerfiles() {
-    // Save original environment variable
-    let original_config = std::env::var("TRELLIS_CONFIG").ok();
-
-    // Ensure cleanup happens even if test panics
-    struct EnvCleanup(Option<String>);
-    impl Drop for EnvCleanup {
-        fn drop(&mut self) {
-            match &self.0 {
-                Some(val) => std::env::set_var("TRELLIS_CONFIG", val),
-                None => std::env::remove_var("TRELLIS_CONFIG"),
-            }
-        }
-    }
-    let _cleanup = EnvCleanup(original_config);
+    // Use configuration environment guard to prevent race conditions with other tests
+    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
 
     // Create temporary empty config file to override system config
     let temp_config_dir = tempfile::TempDir::new().unwrap();
     let temp_config_path = temp_config_dir.path().join("trellis.toml");
     std::fs::write(&temp_config_path, "# Empty test config").unwrap();
-    std::env::set_var("TRELLIS_CONFIG", &temp_config_path);
+    _config_guard.set_config_path(&temp_config_path.to_string_lossy());
 
     let temp_dir = TempDir::new().unwrap();
     // Don't create any containerfiles

@@ -160,20 +160,8 @@ fn test_discovery_with_permission_denied() {
 
 #[test]
 fn test_app_with_corrupted_config() {
-    // Save original environment variable if it exists
-    let original_config = std::env::var("TRELLIS_CONFIG").ok();
-
-    // Ensure cleanup happens even if test panics
-    struct EnvCleanup(Option<String>);
-    impl Drop for EnvCleanup {
-        fn drop(&mut self) {
-            match &self.0 {
-                Some(val) => std::env::set_var("TRELLIS_CONFIG", val),
-                None => std::env::remove_var("TRELLIS_CONFIG"),
-            }
-        }
-    }
-    let _cleanup = EnvCleanup(original_config);
+    // Use configuration environment guard to prevent race conditions with other tests
+    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
 
     let temp_dir = TempDir::new().unwrap();
     let config_path = temp_dir.path().join("corrupt.toml");
@@ -181,7 +169,7 @@ fn test_app_with_corrupted_config() {
     // Write corrupted TOML
     fs::write(&config_path, "invalid toml [[[").unwrap();
 
-    std::env::set_var("TRELLIS_CONFIG", &config_path);
+    _config_guard.set_config_path(&config_path.to_string_lossy());
 
     let cli = Cli {
         command: Commands::Build,
@@ -360,23 +348,11 @@ fn test_runner_with_extremely_long_arguments() {
 
 #[test]
 fn test_app_with_invalid_src_directory() {
-    // Save and clean environment to avoid interference from other tests
-    let original_config = std::env::var("TRELLIS_CONFIG").ok();
-
-    // Ensure cleanup happens even if test panics
-    struct EnvCleanup(Option<String>);
-    impl Drop for EnvCleanup {
-        fn drop(&mut self) {
-            match &self.0 {
-                Some(val) => std::env::set_var("TRELLIS_CONFIG", val),
-                None => std::env::remove_var("TRELLIS_CONFIG"),
-            }
-        }
-    }
-    let _cleanup = EnvCleanup(original_config);
+    // Use configuration environment guard to prevent race conditions with other tests
+    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
 
     // Clear any existing TRELLIS_CONFIG to test directory validation
-    std::env::remove_var("TRELLIS_CONFIG");
+    _config_guard.remove_config_env();
 
     let temp_dir = TempDir::new().unwrap();
     let invalid_path = temp_dir.path().join("does_not_exist").join("nested");

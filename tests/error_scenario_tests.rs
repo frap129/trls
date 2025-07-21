@@ -60,6 +60,8 @@ fn test_missing_containerfile_error() {
 
 #[test]
 fn test_empty_stages_validation() {
+    // Use configuration environment guard to prevent race conditions with other tests
+    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
     let temp_dir = TempDir::new().unwrap();
 
     let mut cli = create_minimal_cli();
@@ -67,18 +69,13 @@ fn test_empty_stages_validation() {
     cli.rootfs_stages = vec![]; // Empty stages
     cli.src_dir = Some(temp_dir.path().to_path_buf()); // Use temp dir as src_dir
 
-    // Temporarily override the environment variable for this test
-    let original_config = std::env::var("TRELLIS_CONFIG").ok();
-    std::env::remove_var("TRELLIS_CONFIG");
+    // Temporarily remove the environment variable for this test
+    _config_guard.remove_config_env();
 
     // This should not fail during config creation since stages can be specified in file
     let config = TrellisConfig::new(cli).unwrap();
 
-    // Restore original environment
-    match original_config {
-        Some(value) => std::env::set_var("TRELLIS_CONFIG", value),
-        None => std::env::remove_var("TRELLIS_CONFIG"),
-    }
+    // Environment will be restored automatically when _config_guard is dropped
 
     // The config may have default stages from system config, but CLI had empty stages
     // This test validates that empty CLI stages don't cause config creation to fail
@@ -87,6 +84,8 @@ fn test_empty_stages_validation() {
 
 #[test]
 fn test_invalid_config_file() {
+    // Use configuration environment guard to prevent race conditions with other tests
+    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
     let temp_dir = TempDir::new().unwrap();
     let config_path = temp_dir.path().join("invalid.toml");
 
@@ -94,13 +93,12 @@ fn test_invalid_config_file() {
     fs::write(&config_path, "invalid toml content [[[").unwrap();
 
     // Set environment variable to use our invalid config
-    std::env::set_var("TRELLIS_CONFIG", config_path);
+    _config_guard.set_config_path(&config_path.to_string_lossy());
 
     let cli = create_minimal_cli();
     let result = TrellisConfig::new(cli);
 
-    // Clean up environment
-    std::env::remove_var("TRELLIS_CONFIG");
+    // Environment will be restored automatically when _config_guard is dropped
 
     assert!(result.is_err());
     let error_msg = result.unwrap_err().to_string();
