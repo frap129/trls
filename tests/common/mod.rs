@@ -34,7 +34,7 @@ LABEL group="{group}" stage="{stage}"
 "#
         );
 
-        let containerfile_path = group_dir.join(format!("Containerfile.{stage}"));
+        let containerfile_path = group_dir.join(format!("Containerfile.{group}"));
         fs::write(containerfile_path, containerfile_content).unwrap();
     }
 }

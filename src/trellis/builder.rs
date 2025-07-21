@@ -200,7 +200,14 @@ impl<'a> ContainerBuilder<'a> {
                 format!("trellis-{tmp_name}-{stage}")
             };
 
-            let containerfile_path = self.discovery.find_containerfile(&group)?;
+            // For "group:stage" syntax, look for Containerfile.group containing stage target
+            let containerfile_path = if stage != group {
+                // group:stage syntax - look for file named after group
+                self.discovery.find_containerfile(&group)?
+            } else {
+                // simple stage name - look for file named after stage
+                self.discovery.find_containerfile(&stage)?
+            };
 
             self.msg(&format!(
                 "Building stage {}/{}: {} -> {}",

@@ -43,21 +43,19 @@ fn test_containerfile_discovery_nested_structure() {
         &temp_dir,
         &[
             ("base", "base"),
-            ("features", "gpu"),
-            ("features", "bluetooth"),
+            ("features", "gpu"),  // Creates features/Containerfile.features
             ("desktops", "hyprland"),
         ],
     );
 
-    // Verify nested files were created
+    // Verify nested files were created with correct group-based naming
     assert_file_exists(&temp_dir.path().join("base/Containerfile.base"));
-    assert_file_exists(&temp_dir.path().join("features/Containerfile.gpu"));
-    assert_file_exists(&temp_dir.path().join("features/Containerfile.bluetooth"));
-    assert_file_exists(&temp_dir.path().join("desktops/Containerfile.hyprland"));
+    assert_file_exists(&temp_dir.path().join("features/Containerfile.features"));
+    assert_file_exists(&temp_dir.path().join("desktops/Containerfile.desktops"));
 
-    // Verify content
+    // Verify content - the last stage in each group will be what's in the file
     assert_file_contains(
-        &temp_dir.path().join("features/Containerfile.gpu"),
+        &temp_dir.path().join("features/Containerfile.features"),
         "Building group: features stage: gpu",
     );
 }

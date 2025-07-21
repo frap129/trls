@@ -179,9 +179,8 @@ fn test_build_with_multistage_syntax() {
     let stages = vec!["gpu:base".to_string(), "gpu:cuda".to_string()];
     let result =
         builder.build_multistage_container("builder", "test-builder", &stages, BuildType::Builder);
-    // TODO: Fix multistage discovery - test expects Containerfile.gpu in nested structure
-    // assert!(result.is_ok());
-    assert!(result.is_err()); // Temporarily expect error until discovery is fixed
+    // Multistage discovery is now fixed - both stages use the same Containerfile.gpu
+    assert!(result.is_ok());
 }
 
 #[test]
@@ -370,9 +369,8 @@ fn test_build_stage_tagging_multistage_syntax() {
     let stages = vec!["gpu:base".to_string(), "gpu:cuda".to_string()];
     let result =
         builder.build_multistage_container("builder", "final-tag", &stages, BuildType::Builder);
-    // TODO: Fix multistage discovery - test expects Containerfile.gpu in nested structure
-    // assert!(result.is_ok());
-    assert!(result.is_err()); // Temporarily expect error until discovery is fixed
+    // Multistage discovery is now fixed - both stages use the same Containerfile.gpu  
+    assert!(result.is_ok());
 }
 
 #[test]

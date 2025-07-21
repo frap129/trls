@@ -313,23 +313,32 @@ impl<'a> ContainerfileDiscovery<'a> {
             return Ok(());
         }
 
-        // Extract unique stage names (not group names) from stages
-        // For "gpu:cuda" we want to find "Containerfile.cuda", not "Containerfile.gpu"
-        let stage_names: Vec<String> = stages
+        // For group:stage syntax, we need to find the containerfile for the group
+        // For simple stage syntax, we need to find the containerfile for the stage
+        let containerfile_names: Vec<String> = stages
             .iter()
-            .map(|stage| Self::parse_stage_name(stage).1) // Extract stage part, not group
+            .map(|stage| {
+                let (group, stage_name) = Self::parse_stage_name(stage);
+                if group == stage_name {
+                    // Simple stage syntax: look for Containerfile.stage
+                    stage_name
+                } else {
+                    // Group:stage syntax: look for Containerfile.group
+                    group
+                }
+            })
             .collect::<HashSet<_>>() // Remove duplicates
             .into_iter()
             .collect();
 
         // Use batch discovery for efficiency
-        let found_files = self.find_multiple_containerfiles(&stage_names)?;
+        let found_files = self.find_multiple_containerfiles(&containerfile_names)?;
 
         // Check for missing files
         let mut missing_files = Vec::new();
-        for stage_name in &stage_names {
-            if !found_files.contains_key(stage_name) {
-                missing_files.push(format!("{}{stage_name}", patterns::CONTAINERFILE_PREFIX));
+        for containerfile_name in &containerfile_names {
+            if !found_files.contains_key(containerfile_name) {
+                missing_files.push(format!("{}{containerfile_name}", patterns::CONTAINERFILE_PREFIX));
             }
         }
 

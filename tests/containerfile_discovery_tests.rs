@@ -263,19 +263,21 @@ fn test_validate_stages_mixed_flat_and_nested() {
 #[test]
 fn test_validate_stages_nested_syntax_missing() {
     let temp_dir = TempDir::new().unwrap();
+    // Create gpu containerfile but not cpu containerfile
     common::setup_nested_containerfiles(&temp_dir, &[("gpu", "base")]);
-    // Missing "gpu:cuda"
+    // gpu:base and gpu:cuda should both use Containerfile.gpu (which exists)
+    // but cpu:v1 should look for Containerfile.cpu (which doesn't exist)
 
     let config = create_discovery_config(&temp_dir);
     let discovery = ContainerfileDiscovery::new(&config);
 
-    let stages = vec!["gpu:base".to_string(), "gpu:cuda".to_string()];
+    let stages = vec!["gpu:base".to_string(), "gpu:cuda".to_string(), "cpu:v1".to_string()];
     let result = discovery.validate_stages(&stages);
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("Missing required containerfiles"));
+    let error_message = result.unwrap_err().to_string();
+    assert!(error_message.contains("Missing required containerfiles"));
+    assert!(error_message.contains("Containerfile.cpu"));
+    assert!(!error_message.contains("Containerfile.gpu")); // gpu should be found
 }
 
 #[test]
