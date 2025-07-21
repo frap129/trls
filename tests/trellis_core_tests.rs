@@ -34,7 +34,7 @@ fn test_trellis_creation() {
     let config = create_test_config(&temp_dir);
     let executor = Arc::new(MockScenarios::all_success());
 
-    let trellis = Trellis::new(&config, executor);
+    let _trellis = Trellis::new(&config, executor);
     // Test passes if no panic occurs during creation
 }
 

@@ -418,7 +418,7 @@ fn test_recursive_search_depth_limit() {
 
     // This should either find the file or gracefully fail
     // (depending on implementation limits)
-    let result = discovery.find_containerfile("deep");
+    let _result = discovery.find_containerfile("deep");
     // We don't assert success/failure here since deep nesting behavior
     // may be implementation-dependent, but it shouldn't panic
 }

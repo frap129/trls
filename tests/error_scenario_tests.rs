@@ -73,7 +73,7 @@ fn test_empty_stages_validation() {
     _config_guard.remove_config_env();
 
     // This should not fail during config creation since stages can be specified in file
-    let config = TrellisConfig::new(cli).unwrap();
+    let _config = TrellisConfig::new(cli).unwrap();
 
     // Environment will be restored automatically when _config_guard is dropped
 
