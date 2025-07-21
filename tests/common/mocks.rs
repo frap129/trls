@@ -121,6 +121,7 @@ impl MockCommandExecutorBuilder {
     }
 
     /// Configure generic execute command support for image validation, etc.
+    #[allow(dead_code)]
     pub fn with_execute_support(mut self) -> Self {
         self.mock.expect_execute().returning(|command, args| {
             if command == "podman" && args.len() >= 2 && args[0] == "image" && args[1] == "exists" {
@@ -135,6 +136,7 @@ impl MockCommandExecutorBuilder {
     }
 
     /// Configure build failures for specific commands.
+    #[allow(dead_code)]
     pub fn with_build_failures(mut self, failing_commands: &[&str]) -> Self {
         for command in failing_commands {
             let command_owned = command.to_string();
@@ -222,6 +224,7 @@ fn format_images_output(images: &[MockImageInfo]) -> String {
 /// Test environment setup utilities.
 pub struct TestEnvironment {
     pub temp_dir: tempfile::TempDir,
+    #[allow(dead_code)]
     pub mock_executor: MockCommandExecutor,
 }
 
@@ -247,6 +250,7 @@ impl TestEnvironment {
     }
 
     /// Create environment with specific executor configuration.
+    #[allow(dead_code)]
     pub fn with_executor(mock_executor: MockCommandExecutor) -> Self {
         let temp_dir = tempfile::TempDir::new().expect("Failed to create temp dir");
         Self {

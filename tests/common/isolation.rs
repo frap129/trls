@@ -81,6 +81,7 @@ impl Default for IsolatedEnvironment {
 
 /// Global mutex to serialize tests that manipulate TRELLIS_CONFIG environment variable.
 /// This prevents race conditions during concurrent test execution under code coverage tools.
+#[allow(dead_code)]
 static CONFIG_ENV_LOCK: Mutex<()> = Mutex::new(());
 
 /// RAII guard for serializing access to TRELLIS_CONFIG environment variable.
@@ -96,6 +97,7 @@ impl ConfigEnvGuard {
     /// Acquire exclusive access to TRELLIS_CONFIG environment variable.
     /// 
     /// This will block until no other test is manipulating the config environment.
+    #[allow(dead_code)]
     pub fn acquire() -> Self {
         let guard = CONFIG_ENV_LOCK.lock().expect("Config env lock poisoned");
         let original_value = env::var("TRELLIS_CONFIG").ok();
@@ -107,11 +109,13 @@ impl ConfigEnvGuard {
     }
     
     /// Set TRELLIS_CONFIG to a specific value.
+    #[allow(dead_code)]
     pub fn set_config_path(&self, path: &str) {
         env::set_var("TRELLIS_CONFIG", path);
     }
     
     /// Remove TRELLIS_CONFIG environment variable.
+    #[allow(dead_code)]
     pub fn remove_config_env(&self) {
         env::remove_var("TRELLIS_CONFIG");
     }
@@ -142,7 +146,9 @@ impl Drop for IsolatedEnvironment {
 
 /// Complete test fixture with isolated environment and mocked executor.
 pub struct TestFixture {
+    #[allow(dead_code)]
     pub environment: IsolatedEnvironment,
+    #[allow(dead_code)]
     pub executor: Arc<dyn CommandExecutor>,
     pub src_dir: PathBuf,
     pub pacman_cache: PathBuf,
@@ -214,6 +220,7 @@ impl TestFixture {
     }
 
     /// Get a clone of the executor.
+    #[allow(dead_code)]
     pub fn executor(&self) -> Arc<dyn CommandExecutor> {
         Arc::clone(&self.executor)
     }

@@ -5,6 +5,7 @@ use tempfile::TempDir;
 pub mod isolation;
 pub mod mocks;
 
+#[allow(dead_code)]
 pub fn setup_test_containerfiles(temp_dir: &TempDir, stages: &[&str]) {
     for stage in stages {
         let containerfile_content = format!(
