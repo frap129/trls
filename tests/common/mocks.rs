@@ -309,9 +309,45 @@ impl MockScenarios {
 
     /// Scenario: Build operations fail.
     pub fn build_failures() -> MockCommandExecutor {
-        MockCommandExecutorBuilder::new()
-            .with_build_failures(&["builder", "stage"])
-            .build()
+        let mut mock = MockCommandExecutor::new();
+
+        // Accept any podman build command and return failure (multiple times)
+        mock.expect_podman_build()
+            .times(..)
+            .returning(|_| Ok(create_failure_output("Build failed")));
+
+        // Accept other commands with flexible expectations
+        mock.expect_podman_run()
+            .times(..)
+            .returning(|_| Ok(create_success_output("Container executed successfully")));
+
+        mock.expect_podman_images().times(..).returning(|_| {
+            Ok(create_success_output(
+                "REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\n",
+            ))
+        });
+
+        mock.expect_podman_rmi()
+            .times(..)
+            .returning(|_| Ok(create_success_output("Image removed successfully")));
+
+        mock.expect_bootc().times(..).returning(|args| {
+            if args.contains(&"--version".to_string()) {
+                Ok(create_success_output("bootc 1.0.0"))
+            } else {
+                Ok(create_success_output("bootc command executed"))
+            }
+        });
+
+        mock.expect_execute().times(..).returning(|command, args| {
+            if command == "podman" && args.len() >= 2 && args[0] == "image" && args[1] == "exists" {
+                Ok(create_success_output(""))
+            } else {
+                Ok(create_success_output("Command executed successfully"))
+            }
+        });
+
+        mock
     }
 
     /// Scenario: No images exist.
@@ -323,15 +359,49 @@ impl MockScenarios {
 
     /// Scenario: Multiple images need cleanup.
     pub fn multiple_images() -> MockCommandExecutor {
-        MockCommandExecutorBuilder::new()
-            .with_images(vec![
-                MockImageInfo::new("abc123", "localhost/test-builder", "latest"),
-                MockImageInfo::new("def456", "localhost/test-rootfs", "latest"),
-                MockImageInfo::new("ghi789", "localhost/test-builder", "intermediate"),
-                MockImageInfo::new("jkl012", "localhost/test-rootfs", "intermediate"),
-            ])
-            .with_successful_rmi()
-            .build()
+        let mut mock = MockCommandExecutor::new();
+
+        // Accept any podman build command (multiple times)
+        mock.expect_podman_build()
+            .times(..)
+            .returning(|_| Ok(create_success_output("Build completed successfully")));
+
+        // Accept any podman run command (multiple times)
+        mock.expect_podman_run()
+            .times(..)
+            .returning(|_| Ok(create_success_output("Container executed successfully")));
+
+        // Return multiple images for cleanup
+        mock.expect_podman_images()
+            .times(..)
+            .returning(|_| Ok(create_success_output("REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\nlocalhost/test-builder\tlatest\tabc123\t2024-01-01T00:00:00Z\t100MB\nlocalhost/test-rootfs\tlatest\tdef456\t2024-01-01T00:00:00Z\t100MB\nlocalhost/test-builder\tintermediate\tghi789\t2024-01-01T00:00:00Z\t100MB\nlocalhost/test-rootfs\tintermediate\tjkl012\t2024-01-01T00:00:00Z\t100MB\n")));
+
+        // Accept any podman rmi command (multiple times)
+        mock.expect_podman_rmi()
+            .times(..)
+            .returning(|_| Ok(create_success_output("Image removed successfully")));
+
+        // Accept any bootc command (multiple times)
+        mock.expect_bootc().times(..).returning(|args| {
+            if args.contains(&"--version".to_string()) {
+                Ok(create_success_output("bootc 1.0.0"))
+            } else if args.contains(&"upgrade".to_string()) {
+                Ok(create_success_output("Upgrade completed successfully"))
+            } else {
+                Ok(create_success_output("bootc command executed"))
+            }
+        });
+
+        // Accept any execute command (multiple times)
+        mock.expect_execute().times(..).returning(|command, args| {
+            if command == "podman" && args.len() >= 2 && args[0] == "image" && args[1] == "exists" {
+                Ok(create_success_output(""))
+            } else {
+                Ok(create_success_output("Command executed successfully"))
+            }
+        });
+
+        mock
     }
 }
 
