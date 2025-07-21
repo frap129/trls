@@ -263,7 +263,7 @@ fn test_extra_contexts_and_mounts() {
     let mut cli = create_test_cli_with_command(Commands::Build);
     cli.src_dir = Some(temp_dir.path().to_path_buf());
     cli.extra_contexts = vec!["context1=/tmp".to_string()];
-    cli.extra_mounts = vec!["mount1=/opt".to_string()];
+    cli.extra_mounts = vec!["mount1=/opt".to_string().into()];
 
     let executor = Arc::new(MockScenarios::all_success());
     let app = TrellisApp::with_executor(cli, executor).unwrap();

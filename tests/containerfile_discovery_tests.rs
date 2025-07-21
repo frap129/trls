@@ -92,8 +92,9 @@ fn test_find_containerfile_not_found() {
 
     let result = discovery.find_containerfile("missing");
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Containerfile not found"));
-    assert!(result.unwrap_err().to_string().contains("Containerfile.missing"));
+    let error_message = result.unwrap_err().to_string();
+    assert!(error_message.contains("Containerfile not found"));
+    assert!(error_message.contains("Containerfile.missing"));
 }
 
 #[test]
@@ -211,8 +212,9 @@ fn test_validate_stages_some_missing() {
     let stages = vec!["base".to_string(), "tools".to_string(), "final".to_string()];
     let result = discovery.validate_stages(&stages);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Missing required containerfiles"));
-    assert!(result.unwrap_err().to_string().contains("Containerfile.final"));
+    let error_message = result.unwrap_err().to_string();
+    assert!(error_message.contains("Missing required containerfiles"));
+    assert!(error_message.contains("Containerfile.final"));
 }
 
 #[test]

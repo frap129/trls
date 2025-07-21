@@ -60,7 +60,7 @@ pub struct Cli {
     pub builder_stages: Vec<String>,
 }
 
-#[derive(Subcommand, Clone)]
+#[derive(Subcommand, Clone, Debug)]
 pub enum Commands {
     /// (Re-)Build pacstrap container that's used by the other commands
     BuildBuilder,

@@ -224,7 +224,10 @@ fn test_build_with_extra_mounts() {
     common::setup_test_containerfiles(&temp_dir, &["base"]);
 
     let mut config = create_builder_config(&temp_dir);
-    config.extra_mounts = vec!["mount1=/var/cache".to_string(), "mount2=/var/log".to_string()];
+    config.extra_mounts = vec![
+        "mount1=/var/cache".to_string().into(), 
+        "mount2=/var/log".to_string().into()
+    ];
 
     let executor = Arc::new(MockScenarios::all_success());
     let builder = ContainerBuilder::new(&config, executor);

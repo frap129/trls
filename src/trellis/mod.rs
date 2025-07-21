@@ -36,6 +36,16 @@ pub struct TrellisApp {
     executor: Arc<dyn CommandExecutor>,
 }
 
+impl std::fmt::Debug for TrellisApp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TrellisApp")
+            .field("config", &self.config)
+            .field("command", &self.command)
+            .field("executor", &"<dyn CommandExecutor>")
+            .finish()
+    }
+}
+
 impl TrellisApp {
     pub fn new(cli: Cli) -> Result<Self> {
         let command = cli.command.clone();
