@@ -3,7 +3,7 @@ name = "trellis"
 version = "0.1.0"
 edition = "2021"
 description = "A container build system for multi-stage builds"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["Joe Maples <joe@maples.dev>"]
 license = "MIT"
 
 [dependencies]
@@ -20,11 +20,10 @@ lru = "0.16"
 tempfile = "3.8"
 assert_cmd = "2.0"
 predicates = "3.0"
-cargo-tarpaulin = "0.31"
+cargo-tarpaulin = "0.32"
 mockall = "0.13"
 serial_test = "3.1"
 
 [[bin]]
 name = "trls"
 path = "src/main.rs"
-
