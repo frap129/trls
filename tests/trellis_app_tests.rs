@@ -4,12 +4,11 @@
 
 mod common;
 
-use common::{isolation::*, mocks::*};
+use common::mocks::*;
 use std::sync::Arc;
 use tempfile::TempDir;
 use trellis::{
     cli::{Cli, Commands},
-    config::TrellisConfig,
     TrellisApp,
 };
 
@@ -150,7 +149,10 @@ fn test_build_builder_with_empty_stages_fails() {
 
     let result = app.run();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("No builder stages"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("No builder stages"));
 }
 
 #[test]
@@ -181,7 +183,10 @@ fn test_build_with_missing_containerfiles() {
 
     let result = app.run();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Containerfile not found"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Containerfile not found"));
 }
 
 #[test]

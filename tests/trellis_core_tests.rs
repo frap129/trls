@@ -4,13 +4,10 @@
 
 mod common;
 
-use common::{isolation::*, mocks::*};
+use common::mocks::*;
 use std::sync::Arc;
 use tempfile::TempDir;
-use trellis::{
-    config::TrellisConfig,
-    trellis::{builder::BuildType, Trellis},
-};
+use trellis::{config::TrellisConfig, trellis::Trellis};
 
 fn create_test_config(temp_dir: &TempDir) -> TrellisConfig {
     TrellisConfig {
@@ -249,8 +246,8 @@ fn test_extra_mounts_configuration() {
 
     let mut config = create_test_config(&temp_dir);
     config.extra_mounts = vec![
-        "mount1=/var/cache".to_string().into(), 
-        "mount2=/var/log".to_string().into()
+        "mount1=/var/cache".to_string().into(),
+        "mount2=/var/log".to_string().into(),
     ];
 
     let executor = Arc::new(MockScenarios::all_success());
@@ -281,18 +278,21 @@ fn test_error_propagation_from_builder() {
     common::setup_test_containerfiles(&temp_dir, &["base"]);
 
     let config = create_test_config(&temp_dir);
-    
+
     let mut mock_executor = MockCommandExecutor::new();
     mock_executor
         .expect_podman_build()
         .returning(|_| Err(anyhow::anyhow!("Build command failed")));
-    
+
     let executor = Arc::new(mock_executor);
     let trellis = Trellis::new(&config, executor);
 
     let result = trellis.build_builder_container();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Build command failed"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Build command failed"));
 }
 
 #[test]
@@ -310,32 +310,38 @@ fn test_error_propagation_from_cleaner() {
     mock_executor
         .expect_podman_images()
         .returning(|_| Err(anyhow::anyhow!("Images command failed")));
-    
+
     let executor = Arc::new(mock_executor);
     let trellis = Trellis::new(&config, executor);
 
     let result = trellis.build_builder_container();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Images command failed"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Images command failed"));
 }
 
 #[test]
 fn test_error_propagation_from_runner() {
     let temp_dir = TempDir::new().unwrap();
     let config = create_test_config(&temp_dir);
-    
+
     let mut mock_executor = MockCommandExecutor::new();
     mock_executor
         .expect_podman_run()
         .returning(|_| Err(anyhow::anyhow!("Run command failed")));
-    
+
     let executor = Arc::new(mock_executor);
     let trellis = Trellis::new(&config, executor);
 
     let args = vec!["echo".to_string(), "hello".to_string()];
     let result = trellis.run_rootfs_container(&args);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Run command failed"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Run command failed"));
 }
 
 #[test]
@@ -357,22 +363,27 @@ fn test_update_failure_in_bootc_phase() {
     common::setup_test_containerfiles(&temp_dir, &["base", "final"]);
 
     let config = create_test_config(&temp_dir);
-    
+
     let mut mock_executor = MockCommandExecutor::new();
     mock_executor
         .expect_podman_build()
         .returning(|_| Ok(create_success_output("Build successful")));
-    mock_executor
-        .expect_podman_images()
-        .returning(|_| Ok(create_success_output("REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\n")));
+    mock_executor.expect_podman_images().returning(|_| {
+        Ok(create_success_output(
+            "REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\n",
+        ))
+    });
     mock_executor
         .expect_bootc()
         .returning(|_| Err(anyhow::anyhow!("Bootc upgrade failed")));
-    
+
     let executor = Arc::new(mock_executor);
     let trellis = Trellis::new(&config, executor);
 
     let result = trellis.update();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Bootc upgrade failed"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Bootc upgrade failed"));
 }

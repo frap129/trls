@@ -4,13 +4,10 @@
 
 mod common;
 
-use common::{isolation::*, mocks::*};
+use common::mocks::*;
 use std::sync::Arc;
 use tempfile::TempDir;
-use trellis::{
-    config::TrellisConfig,
-    trellis::cleaner::{CleanMode, ImageCleaner},
-};
+use trellis::{config::TrellisConfig, trellis::cleaner::ImageCleaner};
 
 fn create_cleaner_config(temp_dir: &TempDir) -> TrellisConfig {
     TrellisConfig {
@@ -105,25 +102,28 @@ fn test_auto_clean_enabled_no_images() {
 fn test_clean_with_images_command_failure() {
     let temp_dir = TempDir::new().unwrap();
     let config = create_cleaner_config(&temp_dir);
-    
+
     let mut mock_executor = MockCommandExecutor::new();
     mock_executor
         .expect_podman_images()
         .returning(|_| Err(anyhow::anyhow!("Images command failed")));
-    
+
     let executor = Arc::new(mock_executor);
     let cleaner = ImageCleaner::new(&config, executor);
 
     let result = cleaner.clean_all();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Images command failed"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Images command failed"));
 }
 
 #[test]
 fn test_clean_with_rmi_command_failure() {
     let temp_dir = TempDir::new().unwrap();
     let config = create_cleaner_config(&temp_dir);
-    
+
     let mut mock_executor = MockCommandExecutor::new();
     // Return images that should be cleaned
     let images = vec![
@@ -131,28 +131,31 @@ fn test_clean_with_rmi_command_failure() {
         MockImageInfo::new("def456", "localhost/trellis-stage-base", "latest"),
     ];
     let images_output = format_images_output(&images);
-    
+
     mock_executor
         .expect_podman_images()
         .returning(move |_| Ok(create_success_output(&images_output)));
-    
+
     mock_executor
         .expect_podman_rmi()
         .returning(|_| Err(anyhow::anyhow!("RMI command failed")));
-    
+
     let executor = Arc::new(mock_executor);
     let cleaner = ImageCleaner::new(&config, executor);
 
     let result = cleaner.clean_all();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("RMI command failed"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("RMI command failed"));
 }
 
 #[test]
 fn test_image_filtering_trellis_images() {
     let temp_dir = TempDir::new().unwrap();
     let config = create_cleaner_config(&temp_dir);
-    
+
     // Create images with trellis prefixes
     let images = vec![
         MockImageInfo::new("abc123", "localhost/test-builder", "latest"),
@@ -162,16 +165,16 @@ fn test_image_filtering_trellis_images() {
         MockImageInfo::new("mno345", "docker.io/ubuntu", "latest"), // Non-trellis image
     ];
     let images_output = format_images_output(&images);
-    
+
     let mut mock_executor = MockCommandExecutor::new();
     mock_executor
         .expect_podman_images()
         .returning(move |_| Ok(create_success_output(&images_output)));
-    
+
     mock_executor
         .expect_podman_rmi()
         .returning(|_| Ok(create_success_output("Images removed")));
-    
+
     let executor = Arc::new(mock_executor);
     let cleaner = ImageCleaner::new(&config, executor);
 
@@ -183,7 +186,7 @@ fn test_image_filtering_trellis_images() {
 fn test_image_filtering_non_trellis_images() {
     let temp_dir = TempDir::new().unwrap();
     let config = create_cleaner_config(&temp_dir);
-    
+
     // Create only non-trellis images
     let images = vec![
         MockImageInfo::new("abc123", "docker.io/ubuntu", "latest"),
@@ -191,12 +194,12 @@ fn test_image_filtering_non_trellis_images() {
         MockImageInfo::new("ghi789", "registry.example.com/app", "v1.0"),
     ];
     let images_output = format_images_output(&images);
-    
+
     let mut mock_executor = MockCommandExecutor::new();
     mock_executor
         .expect_podman_images()
         .returning(move |_| Ok(create_success_output(&images_output)));
-    
+
     // Should not call rmi since no trellis images to remove
     let executor = Arc::new(mock_executor);
     let cleaner = ImageCleaner::new(&config, executor);
@@ -211,23 +214,23 @@ fn test_custom_builder_and_rootfs_tags() {
     let mut config = create_cleaner_config(&temp_dir);
     config.builder_tag = "custom-builder".to_string();
     config.rootfs_tag = "custom-rootfs".to_string();
-    
+
     let images = vec![
         MockImageInfo::new("abc123", "localhost/custom-builder", "latest"),
         MockImageInfo::new("def456", "localhost/custom-rootfs", "latest"),
         MockImageInfo::new("ghi789", "localhost/trellis-stage-base", "latest"),
     ];
     let images_output = format_images_output(&images);
-    
+
     let mut mock_executor = MockCommandExecutor::new();
     mock_executor
         .expect_podman_images()
         .returning(move |_| Ok(create_success_output(&images_output)));
-    
+
     mock_executor
         .expect_podman_rmi()
         .returning(|_| Ok(create_success_output("Images removed")));
-    
+
     let executor = Arc::new(mock_executor);
     let cleaner = ImageCleaner::new(&config, executor);
 
@@ -239,7 +242,7 @@ fn test_custom_builder_and_rootfs_tags() {
 fn test_batch_image_removal() {
     let temp_dir = TempDir::new().unwrap();
     let config = create_cleaner_config(&temp_dir);
-    
+
     // Create multiple trellis images
     let images = vec![
         MockImageInfo::new("abc123", "localhost/test-builder", "latest"),
@@ -249,18 +252,18 @@ fn test_batch_image_removal() {
         MockImageInfo::new("mno345", "localhost/trellis-stage-final", "latest"),
     ];
     let images_output = format_images_output(&images);
-    
+
     let mut mock_executor = MockCommandExecutor::new();
     mock_executor
         .expect_podman_images()
         .returning(move |_| Ok(create_success_output(&images_output)));
-    
+
     // Expect batch removal of multiple images
     mock_executor
         .expect_podman_rmi()
         .times(1) // Should be called once for batch operation
         .returning(|_| Ok(create_success_output("Multiple images removed")));
-    
+
     let executor = Arc::new(mock_executor);
     let cleaner = ImageCleaner::new(&config, executor);
 
@@ -273,23 +276,23 @@ fn test_clean_mode_full_vs_auto() {
     let temp_dir = TempDir::new().unwrap();
     let mut config = create_cleaner_config(&temp_dir);
     config.auto_clean = true;
-    
+
     let images = vec![
         MockImageInfo::new("abc123", "localhost/test-builder", "latest"),
         MockImageInfo::new("def456", "localhost/test-rootfs", "latest"),
         MockImageInfo::new("ghi789", "localhost/trellis-stage-intermediate", "latest"),
     ];
     let images_output = format_images_output(&images);
-    
+
     let mut mock_executor = MockCommandExecutor::new();
     mock_executor
         .expect_podman_images()
         .returning(move |_| Ok(create_success_output(&images_output)));
-    
+
     mock_executor
         .expect_podman_rmi()
         .returning(|_| Ok(create_success_output("Images removed")));
-    
+
     let executor = Arc::new(mock_executor);
     let cleaner = ImageCleaner::new(&config, executor);
 
@@ -306,12 +309,14 @@ fn test_clean_mode_full_vs_auto() {
 fn test_empty_image_list() {
     let temp_dir = TempDir::new().unwrap();
     let config = create_cleaner_config(&temp_dir);
-    
+
     let mut mock_executor = MockCommandExecutor::new();
-    mock_executor
-        .expect_podman_images()
-        .returning(|_| Ok(create_success_output("REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\n")));
-    
+    mock_executor.expect_podman_images().returning(|_| {
+        Ok(create_success_output(
+            "REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\n",
+        ))
+    });
+
     let executor = Arc::new(mock_executor);
     let cleaner = ImageCleaner::new(&config, executor);
 
@@ -323,12 +328,14 @@ fn test_empty_image_list() {
 fn test_malformed_image_list() {
     let temp_dir = TempDir::new().unwrap();
     let config = create_cleaner_config(&temp_dir);
-    
+
     let mut mock_executor = MockCommandExecutor::new();
-    mock_executor
-        .expect_podman_images()
-        .returning(|_| Ok(create_success_output("malformed\nlines\nwithout:proper:format")));
-    
+    mock_executor.expect_podman_images().returning(|_| {
+        Ok(create_success_output(
+            "malformed\nlines\nwithout:proper:format",
+        ))
+    });
+
     let executor = Arc::new(mock_executor);
     let cleaner = ImageCleaner::new(&config, executor);
 
@@ -340,18 +347,21 @@ fn test_malformed_image_list() {
 fn test_images_command_stderr_output() {
     let temp_dir = TempDir::new().unwrap();
     let config = create_cleaner_config(&temp_dir);
-    
+
     let mut mock_executor = MockCommandExecutor::new();
     mock_executor
         .expect_podman_images()
         .returning(|_| Ok(create_failure_output("Images command error")));
-    
+
     let executor = Arc::new(mock_executor);
     let cleaner = ImageCleaner::new(&config, executor);
 
     let result = cleaner.clean_all();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Failed to list images"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Failed to list images"));
 }
 
 fn format_images_output(images: &[MockImageInfo]) -> String {

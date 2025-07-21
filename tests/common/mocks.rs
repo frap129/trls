@@ -9,7 +9,7 @@ use mockall::*;
 use std::process::{ExitStatus, Output};
 
 // Re-export the trait and real implementation for testing
-pub use trellis::trellis::executor::{CommandExecutor, RealCommandExecutor};
+pub use trellis::trellis::executor::CommandExecutor;
 
 /// Mock image information for testing.
 #[derive(Debug, Clone, PartialEq)]
@@ -38,7 +38,7 @@ impl MockImageInfo {
 // Generate mock for the trait
 mock! {
     pub CommandExecutor {}
-    
+
     impl CommandExecutor for CommandExecutor {
         fn podman_build(&self, args: &[String]) -> Result<Output>;
         fn podman_run(&self, args: &[String]) -> Result<Output>;

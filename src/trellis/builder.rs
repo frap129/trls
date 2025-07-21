@@ -1,10 +1,8 @@
 use anyhow::{anyhow, Context, Result};
-use std::{env, fs, process::Command, sync::Arc};
+use std::{env, fs, sync::Arc};
 
 use super::{
-    common::{PodmanContext, TrellisMessaging},
-    constants::{commands, env_vars, errors},
-    discovery::ContainerfileDiscovery,
+    common::TrellisMessaging, constants::env_vars, discovery::ContainerfileDiscovery,
     executor::CommandExecutor,
 };
 use crate::config::TrellisConfig;
@@ -44,7 +42,7 @@ impl Drop for ScopedEnvVar {
 
 /// Builder for constructing podman commands with type safety.
 pub struct PodmanCommandBuilder {
-    cmd: Command,
+    args: Vec<String>,
 }
 
 impl Default for PodmanCommandBuilder {
@@ -55,9 +53,7 @@ impl Default for PodmanCommandBuilder {
 
 impl PodmanCommandBuilder {
     pub fn new() -> Self {
-        Self {
-            cmd: Command::new(commands::PODMAN_CMD),
-        }
+        Self { args: Vec::new() }
     }
 
     /// Creates a new build command with standard capabilities
@@ -70,81 +66,72 @@ impl PodmanCommandBuilder {
             .squash()
     }
 
-    pub fn build_subcommand(mut self) -> Self {
-        self.cmd.arg(commands::BUILD_SUBCMD);
+    pub fn build_subcommand(self) -> Self {
+        // build subcommand is implicit in executor.podman_build
         self
     }
 
     pub fn no_cache(mut self, no_cache: bool) -> Self {
         if no_cache {
-            self.cmd.arg("--no-cache");
+            self.args.push("--no-cache".to_string());
         }
         self
     }
 
     pub fn network_host(mut self) -> Self {
-        self.cmd.args(["--net", "host"]);
+        self.args.extend(["--net".to_string(), "host".to_string()]);
         self
     }
 
     pub fn add_capability(mut self, cap: &str) -> Self {
-        self.cmd.args(["--cap-add", cap]);
+        self.args.extend(["--cap-add".to_string(), cap.to_string()]);
         self
     }
 
     pub fn squash(mut self) -> Self {
-        self.cmd.arg("--squash");
+        self.args.push("--squash".to_string());
         self
     }
 
     pub fn containerfile<P: AsRef<std::path::Path>>(mut self, path: P) -> Self {
-        self.cmd.args(["-f", &path.as_ref().to_string_lossy()]);
+        self.args.extend([
+            "-f".to_string(),
+            path.as_ref().to_string_lossy().to_string(),
+        ]);
         self
     }
 
     pub fn build_arg(mut self, key: &str, value: &str) -> Self {
-        self.cmd.args(["--build-arg", &format!("{key}={value}")]);
+        self.args
+            .extend(["--build-arg".to_string(), format!("{key}={value}")]);
         self
     }
 
     pub fn target(mut self, target: &str) -> Self {
-        self.cmd.args(["--target", target]);
+        self.args
+            .extend(["--target".to_string(), target.to_string()]);
         self
     }
 
     pub fn tag(mut self, tag: &str) -> Self {
-        self.cmd.args(["-t", tag]);
+        self.args.extend(["-t".to_string(), tag.to_string()]);
         self
     }
 
     pub fn volume(mut self, mount: &str) -> Self {
-        self.cmd.args(["-v", mount]);
+        self.args.extend(["-v".to_string(), mount.to_string()]);
         self
     }
 
     pub fn build_context(mut self, context: &str) -> Self {
-        self.cmd.args(["--build-context", context]);
+        self.args
+            .extend(["--build-context".to_string(), context.to_string()]);
         self
     }
 
-    pub fn execute(mut self) -> Result<()> {
-        let status = self.cmd.status().podman_context("build")?;
-
-        if status.success() {
-            Ok(())
-        } else {
-            // Capture more detailed error information
-            let output = Command::new(commands::PODMAN_CMD)
-                .arg(commands::VERSION_SUBCMD)
-                .output()
-                .podman_context("version check")?;
-
-            if !output.status.success() {
-                return Err(anyhow!(errors::PODMAN_NOT_AVAILABLE));
-            }
-
-            Err(anyhow!("Podman build failed with exit code: {:?}. Check podman logs for details. Ensure sufficient disk space and proper permissions.", status.code()))
-        }
+    /// Returns the collected arguments for execution via CommandExecutor.
+    pub fn build_args(self) -> Vec<String> {
+        self.args
     }
 }
 
@@ -238,9 +225,17 @@ impl<'a> ContainerBuilder<'a> {
                 builder = self.add_rootfs_config(builder)?;
             }
 
-            builder
-                .execute()
+            // Execute build using injected executor
+            let build_args = builder.build_args();
+            let output = self
+                .executor
+                .podman_build(&build_args)
                 .with_context(|| format!("Failed to build stage: {build_stage}"))?;
+
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                return Err(anyhow!("Podman build failed with exit code: {:?}. Error: {}. Check podman logs for details. Ensure sufficient disk space and proper permissions.", output.status.code(), stderr));
+            }
 
             last_stage = tag;
         }

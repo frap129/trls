@@ -4,13 +4,9 @@
 
 mod common;
 
-use common::{isolation::*, mocks::*};
 use std::fs;
 use tempfile::TempDir;
-use trellis::{
-    config::TrellisConfig,
-    trellis::discovery::ContainerfileDiscovery,
-};
+use trellis::{config::TrellisConfig, trellis::discovery::ContainerfileDiscovery};
 
 fn create_discovery_config(temp_dir: &TempDir) -> TrellisConfig {
     TrellisConfig {
@@ -62,13 +58,16 @@ fn test_find_containerfile_in_subdirectory() {
 
     let result = discovery.find_containerfile("base");
     assert!(result.is_ok());
-    assert_eq!(result.unwrap(), temp_dir.path().join("base/Containerfile.base"));
+    assert_eq!(
+        result.unwrap(),
+        temp_dir.path().join("base/Containerfile.base")
+    );
 }
 
 #[test]
 fn test_find_containerfile_prefers_subdirectory() {
     let temp_dir = TempDir::new().unwrap();
-    
+
     // Create both root and subdirectory versions
     common::setup_test_containerfiles(&temp_dir, &["base"]);
     common::setup_nested_containerfiles(&temp_dir, &[("base", "base")]);
@@ -79,7 +78,10 @@ fn test_find_containerfile_prefers_subdirectory() {
     let result = discovery.find_containerfile("base");
     assert!(result.is_ok());
     // Should prefer subdirectory version
-    assert_eq!(result.unwrap(), temp_dir.path().join("base/Containerfile.base"));
+    assert_eq!(
+        result.unwrap(),
+        temp_dir.path().join("base/Containerfile.base")
+    );
 }
 
 #[test]
@@ -100,11 +102,15 @@ fn test_find_containerfile_not_found() {
 #[test]
 fn test_find_containerfile_deep_nesting() {
     let temp_dir = TempDir::new().unwrap();
-    
+
     // Create deeply nested structure
-    let deep_path = temp_dir.path().join("deep").join("nested").join("structure");
+    let deep_path = temp_dir
+        .path()
+        .join("deep")
+        .join("nested")
+        .join("structure");
     fs::create_dir_all(&deep_path).unwrap();
-    
+
     let containerfile_path = deep_path.join("Containerfile.deep");
     fs::write(&containerfile_path, "FROM alpine\nRUN echo 'deep nested'").unwrap();
 
@@ -119,15 +125,23 @@ fn test_find_containerfile_deep_nesting() {
 #[test]
 fn test_find_containerfile_multiple_matches() {
     let temp_dir = TempDir::new().unwrap();
-    
+
     // Create multiple potential matches at different nesting levels
     let level1 = temp_dir.path().join("base");
     fs::create_dir_all(&level1).unwrap();
-    fs::write(level1.join("Containerfile.base"), "FROM alpine\nRUN echo 'level1'").unwrap();
-    
+    fs::write(
+        level1.join("Containerfile.base"),
+        "FROM alpine\nRUN echo 'level1'",
+    )
+    .unwrap();
+
     let level2 = temp_dir.path().join("deeper").join("base");
     fs::create_dir_all(&level2).unwrap();
-    fs::write(level2.join("Containerfile.base"), "FROM alpine\nRUN echo 'level2'").unwrap();
+    fs::write(
+        level2.join("Containerfile.base"),
+        "FROM alpine\nRUN echo 'level2'",
+    )
+    .unwrap();
 
     let config = create_discovery_config(&temp_dir);
     let discovery = ContainerfileDiscovery::new(&config);
@@ -258,14 +272,17 @@ fn test_validate_stages_nested_syntax_missing() {
     let stages = vec!["gpu:base".to_string(), "gpu:cuda".to_string()];
     let result = discovery.validate_stages(&stages);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Missing required containerfiles"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Missing required containerfiles"));
 }
 
 #[test]
 fn test_find_containerfile_with_symlinks() {
     let temp_dir = TempDir::new().unwrap();
     common::setup_test_containerfiles(&temp_dir, &["base"]);
-    
+
     // Create a symlink to test handling
     #[cfg(unix)]
     {
@@ -285,7 +302,7 @@ fn test_find_containerfile_with_symlinks() {
 #[test]
 fn test_find_containerfile_case_sensitivity() {
     let temp_dir = TempDir::new().unwrap();
-    
+
     // Create lowercase containerfile
     let containerfile_path = temp_dir.path().join("Containerfile.base");
     fs::write(&containerfile_path, "FROM alpine").unwrap();
@@ -296,7 +313,7 @@ fn test_find_containerfile_case_sensitivity() {
     // Search should be case sensitive
     let result_lower = discovery.find_containerfile("base");
     assert!(result_lower.is_ok());
-    
+
     let result_upper = discovery.find_containerfile("BASE");
     assert!(result_upper.is_err());
 }
@@ -304,10 +321,12 @@ fn test_find_containerfile_case_sensitivity() {
 #[test]
 fn test_find_containerfile_special_characters() {
     let temp_dir = TempDir::new().unwrap();
-    
+
     // Create containerfile with special characters in name
     let special_name = "base-test_v1.0";
-    let containerfile_path = temp_dir.path().join(format!("Containerfile.{}", special_name));
+    let containerfile_path = temp_dir
+        .path()
+        .join(format!("Containerfile.{special_name}"));
     fs::write(&containerfile_path, "FROM alpine").unwrap();
 
     let config = create_discovery_config(&temp_dir);
@@ -321,10 +340,12 @@ fn test_find_containerfile_special_characters() {
 #[test]
 fn test_find_containerfile_unicode_names() {
     let temp_dir = TempDir::new().unwrap();
-    
+
     // Create containerfile with unicode characters
     let unicode_name = "base-测试";
-    let containerfile_path = temp_dir.path().join(format!("Containerfile.{}", unicode_name));
+    let containerfile_path = temp_dir
+        .path()
+        .join(format!("Containerfile.{unicode_name}"));
     fs::write(&containerfile_path, "FROM alpine").unwrap();
 
     let config = create_discovery_config(&temp_dir);
@@ -338,14 +359,14 @@ fn test_find_containerfile_unicode_names() {
 #[test]
 fn test_find_containerfile_very_long_path() {
     let temp_dir = TempDir::new().unwrap();
-    
+
     // Create a very long nested path
     let mut long_path = temp_dir.path().to_path_buf();
     for i in 0..10 {
-        long_path = long_path.join(format!("level{}", i));
+        long_path = long_path.join(format!("level{i}"));
     }
     fs::create_dir_all(&long_path).unwrap();
-    
+
     let containerfile_path = long_path.join("Containerfile.deep");
     fs::write(&containerfile_path, "FROM alpine").unwrap();
 
@@ -366,14 +387,10 @@ fn test_validate_stages_error_message_content() {
     let config = create_discovery_config(&temp_dir);
     let discovery = ContainerfileDiscovery::new(&config);
 
-    let stages = vec![
-        "base".to_string(),
-        "tools".to_string(),
-        "final".to_string(),
-    ];
+    let stages = vec!["base".to_string(), "tools".to_string(), "final".to_string()];
     let result = discovery.validate_stages(&stages);
     assert!(result.is_err());
-    
+
     let error_message = result.unwrap_err().to_string();
     assert!(error_message.contains("Missing required containerfiles"));
     assert!(error_message.contains("Containerfile.tools"));
@@ -385,14 +402,14 @@ fn test_validate_stages_error_message_content() {
 #[test]
 fn test_recursive_search_depth_limit() {
     let temp_dir = TempDir::new().unwrap();
-    
+
     // Create extremely deep nesting to test if there's any depth limit handling
     let mut deep_path = temp_dir.path().to_path_buf();
     for i in 0..50 {
-        deep_path = deep_path.join(format!("level{}", i));
+        deep_path = deep_path.join(format!("level{i}"));
     }
     fs::create_dir_all(&deep_path).unwrap();
-    
+
     let containerfile_path = deep_path.join("Containerfile.deep");
     fs::write(&containerfile_path, "FROM alpine").unwrap();
 
