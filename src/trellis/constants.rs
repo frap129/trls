@@ -54,7 +54,7 @@ pub mod patterns {
     pub const CONTAINERFILE_PREFIX: &str = "Containerfile.";
 
     /// Maximum directory traversal depth for safety
-    pub const MAX_SEARCH_DEPTH: usize = 10;
+    pub const MAX_SEARCH_DEPTH: usize = 20;
 }
 
 /// Podman command constants

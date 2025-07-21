@@ -297,6 +297,10 @@ impl<'a> ContainerfileDiscovery<'a> {
     /// This performs upfront validation to fail fast if any required files are missing.
     /// Uses batch discovery with early termination for improved performance.
     ///
+    /// For stage names with group syntax like "group:stage", this validates that
+    /// the file "Containerfile.stage" exists somewhere in the directory tree
+    /// (typically in the "group" subdirectory).
+    ///
     /// # Arguments
     ///
     /// * `stages` - List of stage names to validate
@@ -309,22 +313,23 @@ impl<'a> ContainerfileDiscovery<'a> {
             return Ok(());
         }
 
-        // Extract unique group names from stages
-        let groups: Vec<String> = stages
+        // Extract unique stage names (not group names) from stages
+        // For "gpu:cuda" we want to find "Containerfile.cuda", not "Containerfile.gpu"
+        let stage_names: Vec<String> = stages
             .iter()
-            .map(|stage| Self::parse_stage_name(stage).0)
+            .map(|stage| Self::parse_stage_name(stage).1) // Extract stage part, not group
             .collect::<HashSet<_>>() // Remove duplicates
             .into_iter()
             .collect();
 
         // Use batch discovery for efficiency
-        let found_files = self.find_multiple_containerfiles(&groups)?;
+        let found_files = self.find_multiple_containerfiles(&stage_names)?;
 
         // Check for missing files
         let mut missing_files = Vec::new();
-        for group in &groups {
-            if !found_files.contains_key(group) {
-                missing_files.push(format!("{}{group}", patterns::CONTAINERFILE_PREFIX));
+        for stage_name in &stage_names {
+            if !found_files.contains_key(stage_name) {
+                missing_files.push(format!("{}{stage_name}", patterns::CONTAINERFILE_PREFIX));
             }
         }
 
