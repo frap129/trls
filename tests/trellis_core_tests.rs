@@ -147,7 +147,7 @@ fn test_build_with_missing_containerfiles() {
     assert!(result
         .unwrap_err()
         .to_string()
-        .contains("Containerfile not found"));
+        .contains("Missing required containerfiles"));
 }
 
 #[test]
