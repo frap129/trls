@@ -290,10 +290,11 @@ fn test_error_propagation_from_builder() {
 
     let result = trellis.build_builder_container();
     assert!(result.is_err());
+    
     assert!(result
         .unwrap_err()
         .to_string()
-        .contains("Build command failed"));
+        .contains("Failed to build stage"));
 }
 
 #[test]
