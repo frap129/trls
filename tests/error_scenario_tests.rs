@@ -6,7 +6,12 @@ use tempfile::TempDir;
 use trellis::{
     cli::{Cli, Commands},
     config::TrellisConfig,
-    ContainerBuilder, ContainerfileDiscovery, ImageCleaner,
+    trellis::{
+        builder::ContainerBuilder,
+        cleaner::ImageCleaner,
+        discovery::ContainerfileDiscovery,
+        executor::RealCommandExecutor,
+    },
 };
 
 fn create_minimal_cli() -> Cli {
@@ -137,7 +142,8 @@ fn test_nonexistent_cache_directory_parent() {
 
     // This test validates that the cache directory creation logic
     // properly handles nested directory creation
-    let _builder = ContainerBuilder::new(&config);
+    let executor = std::sync::Arc::new(RealCommandExecutor::new());
+    let _builder = ContainerBuilder::new(&config, executor);
 
     // The actual podman build would fail since we don't have containerfiles,
     // but the cache directory creation should work
@@ -274,7 +280,8 @@ fn test_readonly_cache_directory() {
     };
 
     // The builder should detect the readonly cache directory
-    let _builder = ContainerBuilder::new(&config);
+    let executor = std::sync::Arc::new(RealCommandExecutor::new());
+    let _builder = ContainerBuilder::new(&config, executor);
 
     // This would fail when trying to build due to readonly cache
     // but we can't test the actual build without containerfiles and podman
@@ -307,7 +314,8 @@ fn test_image_filtering_logic() {
         hooks_dir: None,
     };
 
-    let _cleaner = ImageCleaner::new(&config);
+    let executor = std::sync::Arc::new(RealCommandExecutor::new());
+    let _cleaner = ImageCleaner::new(&config, executor);
 
     // Test image list (we can't test the actual cleaner without podman)
     // but we can verify the configuration is set up correctly

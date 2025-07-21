@@ -7,6 +7,7 @@
 //! - `discovery`: Containerfile discovery logic
 
 use anyhow::Result;
+use std::sync::Arc;
 
 use crate::{
     cli::{Cli, Commands},
@@ -14,12 +15,14 @@ use crate::{
 };
 
 use common::TrellisMessaging;
+use executor::{CommandExecutor, RealCommandExecutor};
 
 pub mod builder;
 pub mod cleaner;
 pub mod common;
 pub mod constants;
 pub mod discovery;
+pub mod executor;
 pub mod runner;
 
 pub use builder::ContainerBuilder;
@@ -30,18 +33,28 @@ pub use runner::ContainerRunner;
 pub struct TrellisApp {
     config: TrellisConfig,
     command: Commands,
+    executor: Arc<dyn CommandExecutor>,
 }
 
 impl TrellisApp {
     pub fn new(cli: Cli) -> Result<Self> {
         let command = cli.command.clone();
         let config = TrellisConfig::new(cli)?;
+        let executor = Arc::new(RealCommandExecutor::new());
 
-        Ok(TrellisApp { config, command })
+        Ok(TrellisApp { config, command, executor })
+    }
+
+    /// Create TrellisApp with custom executor for testing.
+    pub fn with_executor(cli: Cli, executor: Arc<dyn CommandExecutor>) -> Result<Self> {
+        let command = cli.command.clone();
+        let config = TrellisConfig::new(cli)?;
+
+        Ok(TrellisApp { config, command, executor })
     }
 
     pub fn run(&self) -> Result<()> {
-        let trellis = Trellis::new(&self.config);
+        let trellis = Trellis::new(&self.config, Arc::clone(&self.executor));
 
         match &self.command {
             Commands::BuildBuilder => trellis.build_builder_container(),
@@ -59,17 +72,19 @@ pub struct Trellis<'a> {
     builder: ContainerBuilder<'a>,
     cleaner: ImageCleaner<'a>,
     runner: ContainerRunner,
+    executor: Arc<dyn CommandExecutor>,
 }
 
 impl<'a> TrellisMessaging for Trellis<'a> {}
 
 impl<'a> Trellis<'a> {
-    pub fn new(config: &'a TrellisConfig) -> Self {
+    pub fn new(config: &'a TrellisConfig, executor: Arc<dyn CommandExecutor>) -> Self {
         Trellis {
             config,
-            builder: ContainerBuilder::new(config),
-            cleaner: ImageCleaner::new(config),
-            runner: ContainerRunner::new(config),
+            builder: ContainerBuilder::new(config, Arc::clone(&executor)),
+            cleaner: ImageCleaner::new(config, Arc::clone(&executor)),
+            runner: ContainerRunner::new(config, Arc::clone(&executor)),
+            executor,
         }
     }
 

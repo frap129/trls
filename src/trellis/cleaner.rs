@@ -1,9 +1,10 @@
 use anyhow::{anyhow, Context, Result};
-use std::process::Command;
+use std::{process::Command, sync::Arc};
 
 use super::{
     common::TrellisMessaging,
     constants::{commands, containers},
+    executor::CommandExecutor,
 };
 use crate::config::TrellisConfig;
 
@@ -19,13 +20,14 @@ pub enum CleanMode {
 /// Handles cleanup of container images.
 pub struct ImageCleaner<'a> {
     config: &'a TrellisConfig,
+    executor: Arc<dyn CommandExecutor>,
 }
 
 impl<'a> TrellisMessaging for ImageCleaner<'a> {}
 
 impl<'a> ImageCleaner<'a> {
-    pub fn new(config: &'a TrellisConfig) -> Self {
-        Self { config }
+    pub fn new(config: &'a TrellisConfig, executor: Arc<dyn CommandExecutor>) -> Self {
+        Self { config, executor }
     }
 
     /// Removes all trellis-generated container images.

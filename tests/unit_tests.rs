@@ -4,8 +4,12 @@ use tempfile::TempDir;
 use trellis::{
     cli::{Cli, Commands},
     config::{Config, TrellisConfig},
-    trellis::builder::BuildType,
-    ContainerBuilder, ContainerfileDiscovery, TrellisApp,
+    trellis::{
+        builder::{BuildType, ContainerBuilder},
+        discovery::ContainerfileDiscovery,
+        executor::RealCommandExecutor,
+    },
+    TrellisApp,
 };
 
 fn create_test_cli() -> Cli {
@@ -345,7 +349,8 @@ fn test_build_rootfs_container_no_stages() {
     let mut config = create_test_config(&temp_dir);
     config.rootfs_stages = vec![];
 
-    let trellis = trellis::Trellis::new(&config);
+    let executor = std::sync::Arc::new(RealCommandExecutor::new());
+    let trellis = trellis::Trellis::new(&config, executor);
     let result = trellis.build_rootfs_container();
 
     assert!(result.is_err());
@@ -361,7 +366,8 @@ fn test_build_builder_container_no_stages() {
     let mut config = create_test_config(&temp_dir);
     config.builder_stages = vec![];
 
-    let trellis = trellis::Trellis::new(&config);
+    let executor = std::sync::Arc::new(RealCommandExecutor::new());
+    let trellis = trellis::Trellis::new(&config, executor);
     let result = trellis.build_builder_container();
 
     assert!(result.is_err());
@@ -390,7 +396,8 @@ fn test_rootfs_base_functionality_first_stage() {
         hooks_dir: None,
     };
 
-    let builder = ContainerBuilder::new(&config);
+    let executor = std::sync::Arc::new(RealCommandExecutor::new());
+    let builder = ContainerBuilder::new(&config, executor);
 
     // Test first stage (empty last_stage) for rootfs build
     let base_image = builder.determine_base_image(0, BuildType::Rootfs, "");
@@ -420,7 +427,8 @@ fn test_rootfs_base_functionality_subsequent_stages() {
         hooks_dir: None,
     };
 
-    let builder = ContainerBuilder::new(&config);
+    let executor = std::sync::Arc::new(RealCommandExecutor::new());
+    let builder = ContainerBuilder::new(&config, executor);
 
     // Test subsequent stage (non-empty last_stage) for both build types
     let base_image = builder.determine_base_image(1, BuildType::Rootfs, "trellis-stage-base");
@@ -449,7 +457,8 @@ fn test_rootfs_base_with_default_scratch() {
         hooks_dir: None,
     };
 
-    let builder = ContainerBuilder::new(&config);
+    let executor = std::sync::Arc::new(RealCommandExecutor::new());
+    let builder = ContainerBuilder::new(&config, executor);
 
     // Test first stage with default scratch value
     let base_image = builder.determine_base_image(0, BuildType::Rootfs, "");
@@ -485,7 +494,8 @@ fn test_rootfs_base_with_custom_images() {
             hooks_dir: None,
         };
 
-        let builder = ContainerBuilder::new(&config);
+        let executor = std::sync::Arc::new(RealCommandExecutor::new());
+    let builder = ContainerBuilder::new(&config, executor);
         let result = builder.determine_base_image(0, BuildType::Rootfs, "");
         assert_eq!(
             result, base_image_value,

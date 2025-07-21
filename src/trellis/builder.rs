@@ -1,10 +1,11 @@
 use anyhow::{anyhow, Context, Result};
-use std::{env, fs, process::Command};
+use std::{env, fs, process::Command, sync::Arc};
 
 use super::{
     common::{PodmanContext, TrellisMessaging},
     constants::{commands, env_vars, errors},
     discovery::ContainerfileDiscovery,
+    executor::CommandExecutor,
 };
 use crate::config::TrellisConfig;
 
@@ -151,15 +152,17 @@ impl PodmanCommandBuilder {
 pub struct ContainerBuilder<'a> {
     config: &'a TrellisConfig,
     discovery: ContainerfileDiscovery<'a>,
+    executor: Arc<dyn CommandExecutor>,
 }
 
 impl<'a> TrellisMessaging for ContainerBuilder<'a> {}
 
 impl<'a> ContainerBuilder<'a> {
-    pub fn new(config: &'a TrellisConfig) -> Self {
+    pub fn new(config: &'a TrellisConfig, executor: Arc<dyn CommandExecutor>) -> Self {
         Self {
             config,
             discovery: ContainerfileDiscovery::new(config),
+            executor,
         }
     }
 

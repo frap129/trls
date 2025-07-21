@@ -1,9 +1,10 @@
 use anyhow::{anyhow, Context, Result};
-use std::process::Command;
+use std::{process::Command, sync::Arc};
 
 use super::{
     common::{PodmanContext, TrellisMessaging},
     constants::{commands, containers},
+    executor::CommandExecutor,
 };
 use crate::config::TrellisConfig;
 
@@ -87,13 +88,15 @@ impl PodmanRunCommandBuilder {
 }
 
 /// Handles container execution operations.
-pub struct ContainerRunner {}
+pub struct ContainerRunner {
+    executor: Arc<dyn CommandExecutor>,
+}
 
 impl TrellisMessaging for ContainerRunner {}
 
 impl ContainerRunner {
-    pub fn new(_config: &TrellisConfig) -> Self {
-        Self {}
+    pub fn new(_config: &TrellisConfig, executor: Arc<dyn CommandExecutor>) -> Self {
+        Self { executor }
     }
 
     /// Runs a container with the specified tag and arguments.

@@ -24,6 +24,15 @@ test-verbose:
 test-one TEST:
     cargo test {{TEST}}
 
+# Generate test coverage report
+coverage:
+    cargo tarpaulin --out Html --output-dir coverage/ --exclude-files "src/main.rs" "tests/*"
+
+# Generate coverage report and open in browser
+coverage-open: coverage
+    @echo "Opening coverage report..."
+    @if command -v xdg-open >/dev/null 2>&1; then xdg-open coverage/tarpaulin-report.html; else echo "Please open coverage/tarpaulin-report.html manually"; fi
+
 # Check code formatting and linting
 check:
     cargo fmt --check

@@ -2,6 +2,9 @@ use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
 
+pub mod mocks;
+pub mod isolation;
+
 pub fn setup_test_containerfiles(temp_dir: &TempDir, stages: &[&str]) {
     for stage in stages {
         let containerfile_content = format!(
