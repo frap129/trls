@@ -30,9 +30,10 @@ impl IsolatedEnvironment {
     pub fn set_var(&mut self, key: &str, value: &str) {
         // Save original value if we haven't already
         if !self.original_vars.contains_key(key) {
-            self.original_vars.insert(key.to_string(), env::var(key).ok());
+            self.original_vars
+                .insert(key.to_string(), env::var(key).ok());
         }
-        
+
         env::set_var(key, value);
     }
 
@@ -44,13 +45,15 @@ impl IsolatedEnvironment {
     }
 
     /// Set up isolated cache directories.
-    pub fn setup_isolated_caches(&mut self) -> Result<(PathBuf, PathBuf), Box<dyn std::error::Error>> {
+    pub fn setup_isolated_caches(
+        &mut self,
+    ) -> Result<(PathBuf, PathBuf), Box<dyn std::error::Error>> {
         let pacman_cache = self.create_temp_dir()?.path().to_path_buf();
         let aur_cache = self.create_temp_dir()?.path().to_path_buf();
-        
+
         self.set_var("TRELLIS_PACMAN_CACHE", &pacman_cache.to_string_lossy());
         self.set_var("TRELLIS_AUR_CACHE", &aur_cache.to_string_lossy());
-        
+
         Ok((pacman_cache, aur_cache))
     }
 
@@ -106,15 +109,17 @@ impl TestFixture {
     }
 
     /// Create a test fixture with a custom executor.
-    pub fn with_executor(executor: MockCommandExecutor) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn with_executor(
+        executor: MockCommandExecutor,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut environment = IsolatedEnvironment::new();
-        
+
         let src_dir = environment.setup_isolated_source()?;
         let (pacman_cache, aur_cache) = environment.setup_isolated_caches()?;
         let hooks_dir = environment.setup_isolated_hooks()?;
-        
+
         let executor = Arc::new(executor) as Arc<dyn CommandExecutor>;
-        
+
         Ok(Self {
             environment,
             executor,
@@ -198,7 +203,7 @@ impl TestScenarios {
 }
 
 /// Attribute macro-like function for test isolation.
-/// 
+///
 /// This function ensures that each test runs in complete isolation.
 pub fn isolated_test<F, R>(test_fn: F) -> R
 where
@@ -217,13 +222,13 @@ mod tests {
     #[test]
     fn test_isolated_environment_var_management() {
         let original_value = env::var("TEST_VAR").ok();
-        
+
         {
             let mut env = IsolatedEnvironment::new();
             env.set_var("TEST_VAR", "test_value");
             assert_eq!(env::var("TEST_VAR").unwrap(), "test_value");
         } // env should be dropped here
-        
+
         // Check that the original value is restored
         match original_value {
             Some(value) => assert_eq!(env::var("TEST_VAR").unwrap(), value),
@@ -242,17 +247,23 @@ mod tests {
     fn test_isolated_cache_setup() {
         let mut env = IsolatedEnvironment::new();
         let (pacman_cache, aur_cache) = env.setup_isolated_caches().unwrap();
-        
+
         assert!(pacman_cache.exists());
         assert!(aur_cache.exists());
-        assert_eq!(env::var("TRELLIS_PACMAN_CACHE").unwrap(), pacman_cache.to_string_lossy());
-        assert_eq!(env::var("TRELLIS_AUR_CACHE").unwrap(), aur_cache.to_string_lossy());
+        assert_eq!(
+            env::var("TRELLIS_PACMAN_CACHE").unwrap(),
+            pacman_cache.to_string_lossy()
+        );
+        assert_eq!(
+            env::var("TRELLIS_AUR_CACHE").unwrap(),
+            aur_cache.to_string_lossy()
+        );
     }
 
     #[test]
     fn test_test_fixture_creation() {
         let fixture = TestFixture::new().unwrap();
-        
+
         assert!(fixture.src_dir().exists());
         assert!(fixture.pacman_cache().exists());
         assert!(fixture.aur_cache().exists());
@@ -270,9 +281,7 @@ mod tests {
 
     #[test]
     fn test_isolated_test_function() {
-        let result = isolated_test(|| {
-            42
-        });
+        let result = isolated_test(|| 42);
         assert_eq!(result, 42);
     }
 }

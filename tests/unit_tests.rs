@@ -495,7 +495,7 @@ fn test_rootfs_base_with_custom_images() {
         };
 
         let executor = std::sync::Arc::new(RealCommandExecutor::new());
-    let builder = ContainerBuilder::new(&config, executor);
+        let builder = ContainerBuilder::new(&config, executor);
         let result = builder.determine_base_image(0, BuildType::Rootfs, "");
         assert_eq!(
             result, base_image_value,

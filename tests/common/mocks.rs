@@ -35,19 +35,19 @@ impl MockImageInfo {
 pub trait CommandExecutor: Send + Sync {
     /// Execute a podman build command.
     fn podman_build(&self, args: &[String]) -> Result<Output>;
-    
+
     /// Execute a podman run command.
     fn podman_run(&self, args: &[String]) -> Result<Output>;
-    
+
     /// Execute a podman images command.
     fn podman_images(&self, args: &[String]) -> Result<Output>;
-    
+
     /// Execute a podman rmi command.
     fn podman_rmi(&self, args: &[String]) -> Result<Output>;
-    
+
     /// Execute a bootc command.
     fn bootc(&self, args: &[String]) -> Result<Output>;
-    
+
     /// Execute any generic command.
     fn execute(&self, command: &str, args: &[String]) -> Result<Output>;
 }
@@ -75,7 +75,7 @@ impl CommandExecutor for RealCommandExecutor {
             .output()?;
         Ok(output)
     }
-    
+
     fn podman_run(&self, args: &[String]) -> Result<Output> {
         let output = std::process::Command::new("podman")
             .arg("run")
@@ -83,7 +83,7 @@ impl CommandExecutor for RealCommandExecutor {
             .output()?;
         Ok(output)
     }
-    
+
     fn podman_images(&self, args: &[String]) -> Result<Output> {
         let output = std::process::Command::new("podman")
             .arg("images")
@@ -91,7 +91,7 @@ impl CommandExecutor for RealCommandExecutor {
             .output()?;
         Ok(output)
     }
-    
+
     fn podman_rmi(&self, args: &[String]) -> Result<Output> {
         let output = std::process::Command::new("podman")
             .arg("rmi")
@@ -99,18 +99,14 @@ impl CommandExecutor for RealCommandExecutor {
             .output()?;
         Ok(output)
     }
-    
+
     fn bootc(&self, args: &[String]) -> Result<Output> {
-        let output = std::process::Command::new("bootc")
-            .args(args)
-            .output()?;
+        let output = std::process::Command::new("bootc").args(args).output()?;
         Ok(output)
     }
-    
+
     fn execute(&self, command: &str, args: &[String]) -> Result<Output> {
-        let output = std::process::Command::new(command)
-            .args(args)
-            .output()?;
+        let output = std::process::Command::new(command).args(args).output()?;
         Ok(output)
     }
 }
@@ -126,7 +122,7 @@ impl MockCommandExecutorBuilder {
             mock: MockCommandExecutor::new(),
         }
     }
-    
+
     /// Configure successful podman build responses.
     pub fn with_successful_builds(mut self, commands: &[&str]) -> Self {
         for command in commands {
@@ -140,7 +136,7 @@ impl MockCommandExecutorBuilder {
         }
         self
     }
-    
+
     /// Configure successful podman run responses.
     pub fn with_successful_runs(mut self, tags: &[&str]) -> Self {
         for tag in tags {
@@ -154,7 +150,7 @@ impl MockCommandExecutorBuilder {
         }
         self
     }
-    
+
     /// Configure image listing responses.
     pub fn with_images(mut self, images: Vec<MockImageInfo>) -> Self {
         let images_output = format_images_output(&images);
@@ -163,7 +159,7 @@ impl MockCommandExecutorBuilder {
             .returning(move |_| Ok(create_success_output(&images_output)));
         self
     }
-    
+
     /// Configure successful image removal.
     pub fn with_successful_rmi(mut self) -> Self {
         self.mock
@@ -171,23 +167,21 @@ impl MockCommandExecutorBuilder {
             .returning(|_| Ok(create_success_output("Image removed successfully")));
         self
     }
-    
+
     /// Configure bootc command responses.
     pub fn with_bootc_support(mut self) -> Self {
-        self.mock
-            .expect_bootc()
-            .returning(|args| {
-                if args.contains(&"--version".to_string()) {
-                    Ok(create_success_output("bootc 1.0.0"))
-                } else if args.contains(&"upgrade".to_string()) {
-                    Ok(create_success_output("Upgrade completed successfully"))
-                } else {
-                    Ok(create_success_output("bootc command executed"))
-                }
-            });
+        self.mock.expect_bootc().returning(|args| {
+            if args.contains(&"--version".to_string()) {
+                Ok(create_success_output("bootc 1.0.0"))
+            } else if args.contains(&"upgrade".to_string()) {
+                Ok(create_success_output("Upgrade completed successfully"))
+            } else {
+                Ok(create_success_output("bootc command executed"))
+            }
+        });
         self
     }
-    
+
     /// Configure build failures for specific commands.
     pub fn with_build_failures(mut self, failing_commands: &[&str]) -> Self {
         for command in failing_commands {
@@ -201,7 +195,7 @@ impl MockCommandExecutorBuilder {
         }
         self
     }
-    
+
     pub fn build(self) -> MockCommandExecutor {
         self.mock
     }
@@ -243,9 +237,7 @@ fn create_success_status() -> ExitStatus {
     {
         // For non-Unix systems, we need a different approach
         // This will create a successful status for testing
-        std::process::Command::new("true")
-            .status()
-            .unwrap()
+        std::process::Command::new("true").status().unwrap()
     }
 }
 
@@ -259,9 +251,7 @@ fn create_failure_status() -> ExitStatus {
     #[cfg(not(unix))]
     {
         // For non-Unix systems
-        std::process::Command::new("false")
-            .status()
-            .unwrap()
+        std::process::Command::new("false").status().unwrap()
     }
 }
 
@@ -297,13 +287,13 @@ impl TestEnvironment {
             .with_successful_rmi()
             .with_bootc_support()
             .build();
-            
+
         Self {
             temp_dir,
             mock_executor,
         }
     }
-    
+
     /// Create environment with specific executor configuration.
     pub fn with_executor(mock_executor: MockCommandExecutor) -> Self {
         let temp_dir = tempfile::TempDir::new().expect("Failed to create temp dir");
@@ -331,21 +321,21 @@ impl MockScenarios {
             .with_bootc_support()
             .build()
     }
-    
+
     /// Scenario: Build operations fail.
     pub fn build_failures() -> MockCommandExecutor {
         MockCommandExecutorBuilder::new()
             .with_build_failures(&["builder", "stage"])
             .build()
     }
-    
+
     /// Scenario: No images exist.
     pub fn no_images() -> MockCommandExecutor {
         MockCommandExecutorBuilder::new()
             .with_images(vec![])
             .build()
     }
-    
+
     /// Scenario: Multiple images need cleanup.
     pub fn multiple_images() -> MockCommandExecutor {
         MockCommandExecutorBuilder::new()

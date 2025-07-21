@@ -42,7 +42,11 @@ impl TrellisApp {
         let config = TrellisConfig::new(cli)?;
         let executor = Arc::new(RealCommandExecutor::new());
 
-        Ok(TrellisApp { config, command, executor })
+        Ok(TrellisApp {
+            config,
+            command,
+            executor,
+        })
     }
 
     /// Create TrellisApp with custom executor for testing.
@@ -50,7 +54,11 @@ impl TrellisApp {
         let command = cli.command.clone();
         let config = TrellisConfig::new(cli)?;
 
-        Ok(TrellisApp { config, command, executor })
+        Ok(TrellisApp {
+            config,
+            command,
+            executor,
+        })
     }
 
     pub fn run(&self) -> Result<()> {

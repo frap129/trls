@@ -2,8 +2,8 @@ use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
 
-pub mod mocks;
 pub mod isolation;
+pub mod mocks;
 
 pub fn setup_test_containerfiles(temp_dir: &TempDir, stages: &[&str]) {
     for stage in stages {

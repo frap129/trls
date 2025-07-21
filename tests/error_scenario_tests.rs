@@ -7,9 +7,7 @@ use trellis::{
     cli::{Cli, Commands},
     config::TrellisConfig,
     trellis::{
-        builder::ContainerBuilder,
-        cleaner::ImageCleaner,
-        discovery::ContainerfileDiscovery,
+        builder::ContainerBuilder, cleaner::ImageCleaner, discovery::ContainerfileDiscovery,
         executor::RealCommandExecutor,
     },
 };

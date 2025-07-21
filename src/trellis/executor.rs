@@ -13,19 +13,19 @@ use std::process::Output;
 pub trait CommandExecutor: Send + Sync {
     /// Execute a podman build command.
     fn podman_build(&self, args: &[String]) -> Result<Output>;
-    
+
     /// Execute a podman run command.
     fn podman_run(&self, args: &[String]) -> Result<Output>;
-    
+
     /// Execute a podman images command.
     fn podman_images(&self, args: &[String]) -> Result<Output>;
-    
+
     /// Execute a podman rmi command.
     fn podman_rmi(&self, args: &[String]) -> Result<Output>;
-    
+
     /// Execute a bootc command.
     fn bootc(&self, args: &[String]) -> Result<Output>;
-    
+
     /// Execute any generic command.
     fn execute(&self, command: &str, args: &[String]) -> Result<Output>;
 }
@@ -53,7 +53,7 @@ impl CommandExecutor for RealCommandExecutor {
             .output()?;
         Ok(output)
     }
-    
+
     fn podman_run(&self, args: &[String]) -> Result<Output> {
         let output = std::process::Command::new("podman")
             .arg("run")
@@ -61,7 +61,7 @@ impl CommandExecutor for RealCommandExecutor {
             .output()?;
         Ok(output)
     }
-    
+
     fn podman_images(&self, args: &[String]) -> Result<Output> {
         let output = std::process::Command::new("podman")
             .arg("images")
@@ -69,7 +69,7 @@ impl CommandExecutor for RealCommandExecutor {
             .output()?;
         Ok(output)
     }
-    
+
     fn podman_rmi(&self, args: &[String]) -> Result<Output> {
         let output = std::process::Command::new("podman")
             .arg("rmi")
@@ -77,18 +77,14 @@ impl CommandExecutor for RealCommandExecutor {
             .output()?;
         Ok(output)
     }
-    
+
     fn bootc(&self, args: &[String]) -> Result<Output> {
-        let output = std::process::Command::new("bootc")
-            .args(args)
-            .output()?;
+        let output = std::process::Command::new("bootc").args(args).output()?;
         Ok(output)
     }
-    
+
     fn execute(&self, command: &str, args: &[String]) -> Result<Output> {
-        let output = std::process::Command::new(command)
-            .args(args)
-            .output()?;
+        let output = std::process::Command::new(command).args(args).output()?;
         Ok(output)
     }
 }
