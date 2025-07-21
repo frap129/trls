@@ -385,15 +385,23 @@ fn test_update_failure_in_bootc_phase() {
     });
     mock_executor
         .expect_bootc()
-        .returning(|_| Err(anyhow::anyhow!("Bootc upgrade failed")));
+        .times(2) // Called twice: once for --version check, once for upgrade
+        .returning(|args| {
+            if args.contains(&"--version".to_string()) {
+                Ok(create_success_output("bootc 1.0.0")) // Version check passes
+            } else {
+                Err(anyhow::anyhow!("Bootc upgrade failed")) // Upgrade fails
+            }
+        });
 
     let executor = Arc::new(mock_executor);
     let trellis = Trellis::new(&config, executor);
 
     let result = trellis.update();
     assert!(result.is_err());
+    
     assert!(result
         .unwrap_err()
         .to_string()
-        .contains("Bootc upgrade failed"));
+        .contains("Failed to execute bootc upgrade"));
 }
