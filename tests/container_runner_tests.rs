@@ -1,0 +1,392 @@
+//! Comprehensive tests for ContainerRunner functionality.
+//!
+//! Tests cover container execution, bootc operations, and validation logic.
+
+mod common;
+
+use common::{isolation::*, mocks::*};
+use std::sync::Arc;
+use tempfile::TempDir;
+use trellis::{
+    config::TrellisConfig,
+    trellis::runner::{ContainerCapability, ContainerRunner, PodmanRunCommandBuilder},
+};
+
+fn create_runner_config(temp_dir: &TempDir) -> TrellisConfig {
+    TrellisConfig {
+        builder_stages: vec!["base".to_string()],
+        builder_tag: "test-builder".to_string(),
+        podman_build_cache: false,
+        auto_clean: false,
+        pacman_cache: None,
+        aur_cache: None,
+        src_dir: temp_dir.path().to_path_buf(),
+        rootfs_stages: vec!["base".to_string()],
+        rootfs_base: "scratch".to_string(),
+        extra_contexts: vec![],
+        extra_mounts: vec![],
+        rootfs_tag: "test-rootfs".to_string(),
+        hooks_dir: None,
+    }
+}
+
+#[test]
+fn test_container_runner_creation() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = create_runner_config(&temp_dir);
+    let executor = Arc::new(MockScenarios::all_success());
+
+    let _runner = ContainerRunner::new(&config, executor);
+    // Test passes if no panic occurs during creation
+}
+
+#[test]
+fn test_run_container_success() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = create_runner_config(&temp_dir);
+    let executor = Arc::new(MockScenarios::all_success());
+    let runner = ContainerRunner::new(&config, executor);
+
+    let args = vec!["echo".to_string(), "hello".to_string()];
+    let result = runner.run_container("test-rootfs", &args);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_run_container_with_empty_args() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = create_runner_config(&temp_dir);
+    let executor = Arc::new(MockScenarios::all_success());
+    let runner = ContainerRunner::new(&config, executor);
+
+    let args = vec![];
+    let result = runner.run_container("test-rootfs", &args);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_run_container_with_complex_args() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = create_runner_config(&temp_dir);
+    let executor = Arc::new(MockScenarios::all_success());
+    let runner = ContainerRunner::new(&config, executor);
+
+    let args = vec![
+        "/bin/bash".to_string(),
+        "-c".to_string(),
+        "echo 'hello world' && ls -la".to_string(),
+    ];
+    let result = runner.run_container("test-rootfs", &args);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_run_container_image_not_found() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = create_runner_config(&temp_dir);
+    
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_execute()
+        .returning(|_, _| Ok(create_failure_output("Image not found")));
+    
+    let executor = Arc::new(mock_executor);
+    let runner = ContainerRunner::new(&config, executor);
+
+    let args = vec!["echo".to_string(), "hello".to_string()];
+    let result = runner.run_container("nonexistent", &args);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("Container image not found"));
+}
+
+#[test]
+fn test_run_container_execution_failure() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = create_runner_config(&temp_dir);
+    
+    let mut mock_executor = MockCommandExecutor::new();
+    // Image exists check succeeds
+    mock_executor
+        .expect_execute()
+        .with(
+            mockall::predicate::eq("podman"),
+            mockall::predicate::function(|args: &[String]| {
+                args.len() >= 3 && args[0] == "image" && args[1] == "exists"
+            })
+        )
+        .returning(|_, _| Ok(create_success_output("Image exists")));
+    
+    // But run command fails
+    mock_executor
+        .expect_podman_run()
+        .returning(|_| Err(anyhow::anyhow!("Run command failed")));
+    
+    let executor = Arc::new(mock_executor);
+    let runner = ContainerRunner::new(&config, executor);
+
+    let args = vec!["echo".to_string(), "hello".to_string()];
+    let result = runner.run_container("test-rootfs", &args);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("Run command failed"));
+}
+
+#[test]
+fn test_run_bootc_upgrade_success() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = create_runner_config(&temp_dir);
+    let executor = Arc::new(MockScenarios::all_success());
+    let runner = ContainerRunner::new(&config, executor);
+
+    let result = runner.run_bootc_upgrade();
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_run_bootc_upgrade_bootc_not_available() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = create_runner_config(&temp_dir);
+    
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_execute()
+        .with(
+            mockall::predicate::eq("bootc"),
+            mockall::predicate::function(|args: &[String]| {
+                args.len() == 1 && args[0] == "--version"
+            })
+        )
+        .returning(|_, _| Err(anyhow::anyhow!("bootc command not found")));
+    
+    let executor = Arc::new(mock_executor);
+    let runner = ContainerRunner::new(&config, executor);
+
+    let result = runner.run_bootc_upgrade();
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("bootc is not available"));
+}
+
+#[test]
+fn test_run_bootc_upgrade_upgrade_failure() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = create_runner_config(&temp_dir);
+    
+    let mut mock_executor = MockCommandExecutor::new();
+    // Version check succeeds
+    mock_executor
+        .expect_execute()
+        .with(
+            mockall::predicate::eq("bootc"),
+            mockall::predicate::function(|args: &[String]| {
+                args.len() == 1 && args[0] == "--version"
+            })
+        )
+        .returning(|_, _| Ok(create_success_output("bootc 1.0.0")));
+    
+    // But upgrade fails
+    mock_executor
+        .expect_bootc()
+        .with(mockall::predicate::function(|args: &[String]| {
+            args.len() == 1 && args[0] == "upgrade"
+        }))
+        .returning(|_| Ok(create_failure_output("Upgrade failed")));
+    
+    let executor = Arc::new(mock_executor);
+    let runner = ContainerRunner::new(&config, executor);
+
+    let result = runner.run_bootc_upgrade();
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("bootc upgrade failed"));
+}
+
+#[test]
+fn test_container_capability_enum() {
+    assert_eq!(ContainerCapability::All.as_str(), "all");
+}
+
+#[test]
+fn test_podman_run_command_builder_new() {
+    let builder = PodmanRunCommandBuilder::new();
+    // Test passes if no panic occurs during creation
+}
+
+#[test]
+fn test_podman_run_command_builder_default() {
+    let builder = PodmanRunCommandBuilder::default();
+    // Test passes if no panic occurs during creation
+}
+
+#[test]
+fn test_podman_run_command_builder_chaining() {
+    let _builder = PodmanRunCommandBuilder::new()
+        .network_host()
+        .add_capability(ContainerCapability::All)
+        .remove_on_exit()
+        .interactive()
+        .image("test-image")
+        .args(&vec!["echo".to_string(), "hello".to_string()]);
+    // Test passes if no panic occurs during chaining
+}
+
+#[test]
+fn test_container_validation_success() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = create_runner_config(&temp_dir);
+    
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_execute()
+        .with(
+            mockall::predicate::eq("podman"),
+            mockall::predicate::function(|args: &[String]| {
+                args.len() >= 3 && args[0] == "image" && args[1] == "exists"
+            })
+        )
+        .returning(|_, _| Ok(create_success_output("Image exists")));
+    
+    mock_executor
+        .expect_podman_run()
+        .returning(|_| Ok(create_success_output("Container executed")));
+    
+    let executor = Arc::new(mock_executor);
+    let runner = ContainerRunner::new(&config, executor);
+
+    let args = vec!["echo".to_string(), "test".to_string()];
+    let result = runner.run_container("test-rootfs", &args);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_container_validation_failure() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = create_runner_config(&temp_dir);
+    
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_execute()
+        .with(
+            mockall::predicate::eq("podman"),
+            mockall::predicate::function(|args: &[String]| {
+                args.len() >= 3 && args[0] == "image" && args[1] == "exists"
+            })
+        )
+        .returning(|_, _| Ok(create_failure_output("Image not found")));
+    
+    let executor = Arc::new(mock_executor);
+    let runner = ContainerRunner::new(&config, executor);
+
+    let args = vec!["echo".to_string(), "test".to_string()];
+    let result = runner.run_container("missing-image", &args);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("Container image not found"));
+    assert!(result.unwrap_err().to_string().contains("Run 'trls build' first"));
+}
+
+#[test]
+fn test_bootc_validation_success() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = create_runner_config(&temp_dir);
+    
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_execute()
+        .with(
+            mockall::predicate::eq("bootc"),
+            mockall::predicate::function(|args: &[String]| {
+                args.len() == 1 && args[0] == "--version"
+            })
+        )
+        .returning(|_, _| Ok(create_success_output("bootc 1.0.0")));
+    
+    mock_executor
+        .expect_bootc()
+        .returning(|_| Ok(create_success_output("Upgrade completed")));
+    
+    let executor = Arc::new(mock_executor);
+    let runner = ContainerRunner::new(&config, executor);
+
+    let result = runner.run_bootc_upgrade();
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_bootc_validation_failure() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = create_runner_config(&temp_dir);
+    
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_execute()
+        .with(
+            mockall::predicate::eq("bootc"),
+            mockall::predicate::function(|args: &[String]| {
+                args.len() == 1 && args[0] == "--version"
+            })
+        )
+        .returning(|_, _| Err(anyhow::anyhow!("Command not found")));
+    
+    let executor = Arc::new(mock_executor);
+    let runner = ContainerRunner::new(&config, executor);
+
+    let result = runner.run_bootc_upgrade();
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("bootc is not available"));
+}
+
+#[test]
+fn test_run_container_with_localhost_prefix() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = create_runner_config(&temp_dir);
+    
+    let mut mock_executor = MockCommandExecutor::new();
+    
+    // Verify that the image exists check uses the correct localhost prefix
+    mock_executor
+        .expect_execute()
+        .with(
+            mockall::predicate::eq("podman"),
+            mockall::predicate::function(|args: &[String]| {
+                args.len() >= 3 && 
+                args[0] == "image" && 
+                args[1] == "exists" && 
+                args[2].starts_with("localhost/")
+            })
+        )
+        .returning(|_, _| Ok(create_success_output("Image exists")));
+    
+    // Verify that the run command uses the correct localhost prefix
+    mock_executor
+        .expect_podman_run()
+        .with(mockall::predicate::function(|args: &[String]| {
+            args.iter().any(|arg| arg.starts_with("localhost/"))
+        }))
+        .returning(|_| Ok(create_success_output("Container executed")));
+    
+    let executor = Arc::new(mock_executor);
+    let runner = ContainerRunner::new(&config, executor);
+
+    let args = vec!["echo".to_string(), "test".to_string()];
+    let result = runner.run_container("test-rootfs", &args);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_run_container_error_message_includes_build_hint() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = create_runner_config(&temp_dir);
+    
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_execute()
+        .returning(|_, _| Ok(create_failure_output("Image not found")));
+    
+    let executor = Arc::new(mock_executor);
+    let runner = ContainerRunner::new(&config, executor);
+
+    let args = vec!["echo".to_string(), "test".to_string()];
+    let result = runner.run_container("missing-image", &args);
+    assert!(result.is_err());
+    
+    let error_message = result.unwrap_err().to_string();
+    assert!(error_message.contains("Container image not found"));
+    assert!(error_message.contains("Run 'trls build' first"));
+}

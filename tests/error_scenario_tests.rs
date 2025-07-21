@@ -61,11 +61,6 @@ fn test_missing_containerfile_error() {
 #[test]
 fn test_empty_stages_validation() {
     let temp_dir = TempDir::new().unwrap();
-    let nonexistent_config = temp_dir.path().join("nonexistent.toml");
-
-    // Use a unique environment variable name to avoid conflicts
-    let env_var_name = format!("TRELLIS_CONFIG_{}", std::process::id());
-    std::env::set_var(&env_var_name, &nonexistent_config);
 
     let mut cli = create_minimal_cli();
     cli.builder_stages = vec![]; // Empty stages
@@ -74,7 +69,7 @@ fn test_empty_stages_validation() {
 
     // Temporarily override the environment variable for this test
     let original_config = std::env::var("TRELLIS_CONFIG").ok();
-    std::env::set_var("TRELLIS_CONFIG", &nonexistent_config);
+    std::env::remove_var("TRELLIS_CONFIG");
 
     // This should not fail during config creation since stages can be specified in file
     let config = TrellisConfig::new(cli).unwrap();
@@ -84,7 +79,6 @@ fn test_empty_stages_validation() {
         Some(value) => std::env::set_var("TRELLIS_CONFIG", value),
         None => std::env::remove_var("TRELLIS_CONFIG"),
     }
-    std::env::remove_var(&env_var_name);
 
     // But it should fail when trying to build with empty stages
     assert!(config.builder_stages.is_empty());

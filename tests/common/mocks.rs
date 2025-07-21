@@ -8,6 +8,9 @@ use mockall::predicate::*;
 use mockall::*;
 use std::process::{ExitStatus, Output};
 
+// Re-export the trait and real implementation for testing
+pub use trellis::trellis::executor::{CommandExecutor, RealCommandExecutor};
+
 /// Mock image information for testing.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MockImageInfo {
@@ -30,84 +33,19 @@ impl MockImageInfo {
     }
 }
 
-/// Comprehensive executor trait for all external commands.
-#[automock]
-pub trait CommandExecutor: Send + Sync {
-    /// Execute a podman build command.
-    fn podman_build(&self, args: &[String]) -> Result<Output>;
+// Traits and types are already re-exported above
 
-    /// Execute a podman run command.
-    fn podman_run(&self, args: &[String]) -> Result<Output>;
-
-    /// Execute a podman images command.
-    fn podman_images(&self, args: &[String]) -> Result<Output>;
-
-    /// Execute a podman rmi command.
-    fn podman_rmi(&self, args: &[String]) -> Result<Output>;
-
-    /// Execute a bootc command.
-    fn bootc(&self, args: &[String]) -> Result<Output>;
-
-    /// Execute any generic command.
-    fn execute(&self, command: &str, args: &[String]) -> Result<Output>;
-}
-
-/// Real command executor for production use.
-pub struct RealCommandExecutor;
-
-impl RealCommandExecutor {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for RealCommandExecutor {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl CommandExecutor for RealCommandExecutor {
-    fn podman_build(&self, args: &[String]) -> Result<Output> {
-        let output = std::process::Command::new("podman")
-            .arg("build")
-            .args(args)
-            .output()?;
-        Ok(output)
-    }
-
-    fn podman_run(&self, args: &[String]) -> Result<Output> {
-        let output = std::process::Command::new("podman")
-            .arg("run")
-            .args(args)
-            .output()?;
-        Ok(output)
-    }
-
-    fn podman_images(&self, args: &[String]) -> Result<Output> {
-        let output = std::process::Command::new("podman")
-            .arg("images")
-            .args(args)
-            .output()?;
-        Ok(output)
-    }
-
-    fn podman_rmi(&self, args: &[String]) -> Result<Output> {
-        let output = std::process::Command::new("podman")
-            .arg("rmi")
-            .args(args)
-            .output()?;
-        Ok(output)
-    }
-
-    fn bootc(&self, args: &[String]) -> Result<Output> {
-        let output = std::process::Command::new("bootc").args(args).output()?;
-        Ok(output)
-    }
-
-    fn execute(&self, command: &str, args: &[String]) -> Result<Output> {
-        let output = std::process::Command::new(command).args(args).output()?;
-        Ok(output)
+// Generate mock for the trait
+mock! {
+    pub CommandExecutor {}
+    
+    impl CommandExecutor for CommandExecutor {
+        fn podman_build(&self, args: &[String]) -> Result<Output>;
+        fn podman_run(&self, args: &[String]) -> Result<Output>;
+        fn podman_images(&self, args: &[String]) -> Result<Output>;
+        fn podman_rmi(&self, args: &[String]) -> Result<Output>;
+        fn bootc(&self, args: &[String]) -> Result<Output>;
+        fn execute(&self, command: &str, args: &[String]) -> Result<Output>;
     }
 }
 
