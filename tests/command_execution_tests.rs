@@ -242,7 +242,22 @@ fn test_test_environment_with_custom_executor() {
 
 #[test]
 fn test_command_executor_trait_methods() {
-    let mock = MockScenarios::all_success();
+    let mut mock = MockCommandExecutor::new();
+
+    // Set up expectations for empty argument calls
+    mock.expect_podman_build()
+        .returning(|_| Ok(create_success_output("Build success")));
+    mock.expect_podman_run()
+        .returning(|_| Ok(create_success_output("Run success")));
+    mock.expect_podman_images()
+        .returning(|_| Ok(create_success_output("Images success")));
+    mock.expect_podman_rmi()
+        .returning(|_| Ok(create_success_output("RMI success")));
+    mock.expect_bootc()
+        .returning(|_| Ok(create_success_output("Bootc success")));
+    mock.expect_execute()
+        .returning(|_, _| Ok(create_success_output("Execute success")));
+
     let executor: &dyn CommandExecutor = &mock;
 
     // Test all trait methods are callable
@@ -289,7 +304,22 @@ fn test_mock_image_info_clone() {
 
 #[test]
 fn test_arc_executor_usage() {
-    let executor = Arc::new(MockScenarios::all_success());
+    let mut mock = MockCommandExecutor::new();
+
+    // Set up expectations for the specific "test" arguments
+    mock.expect_podman_build()
+        .with(mockall::predicate::function(|args: &[String]| {
+            args.len() == 1 && args[0] == "test"
+        }))
+        .returning(|_| Ok(create_success_output("Build success")));
+
+    mock.expect_podman_run()
+        .with(mockall::predicate::function(|args: &[String]| {
+            args.len() == 1 && args[0] == "test"
+        }))
+        .returning(|_| Ok(create_success_output("Run success")));
+
+    let executor = Arc::new(mock);
     let executor_clone = Arc::clone(&executor);
 
     // Test that Arc<dyn CommandExecutor> works properly
@@ -386,7 +416,15 @@ fn test_executor_empty_arguments() {
 
 #[test]
 fn test_executor_unicode_arguments() {
-    let mock = MockScenarios::all_success();
+    let mut mock = MockCommandExecutor::new();
+
+    // Set up expectations for unicode arguments
+    mock.expect_podman_build()
+        .with(mockall::predicate::function(|args: &[String]| {
+            args.len() == 2 && args[0] == "--tag" && args[1] == "测试镜像:latest"
+        }))
+        .returning(|_| Ok(create_success_output("Unicode build success")));
+
     let executor: &dyn CommandExecutor = &mock;
 
     // Test with unicode arguments
