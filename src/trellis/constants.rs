@@ -57,26 +57,6 @@ pub mod patterns {
     pub const MAX_SEARCH_DEPTH: usize = 20;
 }
 
-/// Podman command constants
-pub mod commands {
-    /// Main podman command
-    pub const PODMAN_CMD: &str = "podman";
-
-    /// Build subcommand
-    pub const BUILD_SUBCMD: &str = "build";
-
-    /// Remove image subcommand
-    pub const RMI_SUBCMD: &str = "rmi";
-
-    /// Run container subcommand
-    pub const RUN_SUBCMD: &str = "run";
-
-    /// Images subcommand
-    pub const IMAGES_SUBCMD: &str = "images";
-
-    /// Version subcommand
-    pub const VERSION_SUBCMD: &str = "--version";
-}
 
 /// Common error messages
 pub mod errors {
@@ -92,6 +72,4 @@ pub mod errors {
     /// Containerfile not found error
     pub const CONTAINERFILE_NOT_FOUND: &str = "Containerfile not found";
 
-    /// Podman not available error
-    pub const PODMAN_NOT_AVAILABLE: &str = "Podman is not available or not working correctly";
 }
