@@ -120,6 +120,20 @@ impl MockCommandExecutorBuilder {
         self
     }
 
+    /// Configure generic execute command support for image validation, etc.
+    pub fn with_execute_support(mut self) -> Self {
+        self.mock.expect_execute().returning(|command, args| {
+            if command == "podman" && args.len() >= 2 && args[0] == "image" && args[1] == "exists" {
+                // Image exists check - return success
+                Ok(create_success_output(""))
+            } else {
+                // Generic success for other execute calls
+                Ok(create_success_output("Command executed successfully"))
+            }
+        });
+        self
+    }
+
     /// Configure build failures for specific commands.
     pub fn with_build_failures(mut self, failing_commands: &[&str]) -> Self {
         for command in failing_commands {
@@ -257,6 +271,7 @@ impl MockScenarios {
             ])
             .with_successful_rmi()
             .with_bootc_support()
+            .with_execute_support()
             .build()
     }
 

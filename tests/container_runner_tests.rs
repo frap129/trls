@@ -122,7 +122,7 @@ fn test_run_container_execution_failure() {
     // But run command fails
     mock_executor
         .expect_podman_run()
-        .returning(|_| Err(anyhow::anyhow!("Run command failed")));
+        .returning(|_| Ok(common::mocks::create_failure_output("Run command failed")));
 
     let executor = Arc::new(mock_executor);
     let runner = ContainerRunner::new(&config, executor);
@@ -154,14 +154,11 @@ fn test_run_bootc_upgrade_bootc_not_available() {
 
     let mut mock_executor = MockCommandExecutor::new();
     mock_executor
-        .expect_execute()
-        .with(
-            mockall::predicate::eq("bootc"),
-            mockall::predicate::function(|args: &[String]| {
-                args.len() == 1 && args[0] == "--version"
-            }),
-        )
-        .returning(|_, _| Err(anyhow::anyhow!("bootc command not found")));
+        .expect_bootc()
+        .with(mockall::predicate::function(|args: &[String]| {
+            args.len() == 1 && args[0] == "--version"
+        }))
+        .returning(|_| Err(anyhow::anyhow!("bootc command not found")));
 
     let executor = Arc::new(mock_executor);
     let runner = ContainerRunner::new(&config, executor);
@@ -182,14 +179,11 @@ fn test_run_bootc_upgrade_upgrade_failure() {
     let mut mock_executor = MockCommandExecutor::new();
     // Version check succeeds
     mock_executor
-        .expect_execute()
-        .with(
-            mockall::predicate::eq("bootc"),
-            mockall::predicate::function(|args: &[String]| {
-                args.len() == 1 && args[0] == "--version"
-            }),
-        )
-        .returning(|_, _| Ok(create_success_output("bootc 1.0.0")));
+        .expect_bootc()
+        .with(mockall::predicate::function(|args: &[String]| {
+            args.len() == 1 && args[0] == "--version"
+        }))
+        .returning(|_| Ok(create_success_output("bootc 1.0.0")));
 
     // But upgrade fails
     mock_executor
@@ -331,14 +325,11 @@ fn test_bootc_validation_failure() {
 
     let mut mock_executor = MockCommandExecutor::new();
     mock_executor
-        .expect_execute()
-        .with(
-            mockall::predicate::eq("bootc"),
-            mockall::predicate::function(|args: &[String]| {
-                args.len() == 1 && args[0] == "--version"
-            }),
-        )
-        .returning(|_, _| Err(anyhow::anyhow!("Command not found")));
+        .expect_bootc()
+        .with(mockall::predicate::function(|args: &[String]| {
+            args.len() == 1 && args[0] == "--version"
+        }))
+        .returning(|_| Err(anyhow::anyhow!("Command not found")));
 
     let executor = Arc::new(mock_executor);
     let runner = ContainerRunner::new(&config, executor);
