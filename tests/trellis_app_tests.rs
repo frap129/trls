@@ -133,7 +133,10 @@ fn test_build_with_empty_stages_fails() {
 
     let result = app.run();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("No rootfs stages"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("No rootfs stages defined"));
 }
 
 #[test]
@@ -152,7 +155,7 @@ fn test_build_builder_with_empty_stages_fails() {
     assert!(result
         .unwrap_err()
         .to_string()
-        .contains("No builder stages"));
+        .contains("No builder stages defined"));
 }
 
 #[test]
@@ -205,7 +208,7 @@ fn test_configuration_validation_integration() {
     assert!(result
         .unwrap_err()
         .to_string()
-        .contains("builder_tag and rootfs_tag cannot be the same"));
+        .contains("Builder and rootfs tags must be different"));
 }
 
 #[test]
