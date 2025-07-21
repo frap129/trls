@@ -77,6 +77,7 @@ pub struct TrellisConfig {
     pub extra_mounts: Vec<PathBuf>,
     pub rootfs_tag: String,
     pub hooks_dir: Option<PathBuf>,
+    pub quiet: bool,
 }
 
 impl TrellisConfig {
@@ -163,6 +164,7 @@ impl TrellisConfig {
                 .or_else(|| env_config.and_then(|e| e.src_dir.clone()))
                 .unwrap_or_else(|| PathBuf::from(paths::DEFAULT_SRC_DIR)),
             hooks_dir: Self::resolve_hooks_dir(env_config),
+            quiet: cli.quiet,
         };
 
         // Validate the complete configuration

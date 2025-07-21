@@ -90,7 +90,7 @@ pub struct Trellis<'a> {
     config: &'a TrellisConfig,
     builder: ContainerBuilder<'a>,
     cleaner: ImageCleaner<'a>,
-    runner: ContainerRunner,
+    runner: ContainerRunner<'a>,
     #[allow(dead_code)]
     executor: Arc<dyn CommandExecutor>,
 }

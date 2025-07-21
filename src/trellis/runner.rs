@@ -72,15 +72,16 @@ impl PodmanRunCommandBuilder {
 }
 
 /// Handles container execution operations.
-pub struct ContainerRunner {
+pub struct ContainerRunner<'a> {
+    config: &'a TrellisConfig,
     executor: Arc<dyn CommandExecutor>,
 }
 
-impl TrellisMessaging for ContainerRunner {}
+impl<'a> TrellisMessaging for ContainerRunner<'a> {}
 
-impl ContainerRunner {
-    pub fn new(_config: &TrellisConfig, executor: Arc<dyn CommandExecutor>) -> Self {
-        Self { executor }
+impl<'a> ContainerRunner<'a> {
+    pub fn new(config: &'a TrellisConfig, executor: Arc<dyn CommandExecutor>) -> Self {
+        Self { config, executor }
     }
 
     /// Runs a container with the specified tag and arguments.
@@ -96,18 +97,40 @@ impl ContainerRunner {
             .args(args)
             .run_args();
 
-        let output = self
-            .executor
-            .podman_run(&run_args)
-            .context("Failed to execute podman run command")?;
+        let success = if self.config.quiet {
+            // Use regular execution to capture output when quiet
+            let output = self
+                .executor
+                .podman_run(&run_args)
+                .context("Failed to execute podman run command")?;
 
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow!(
-                "Podman run failed with exit code: {:?}. Error: {}",
-                output.status.code(),
-                stderr
-            ));
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                return Err(anyhow!(
+                    "Podman run failed with exit code: {:?}. Error: {}",
+                    output.status.code(),
+                    stderr
+                ));
+            }
+            output.status.success()
+        } else {
+            // Use streaming execution to show live output
+            let status = self
+                .executor
+                .podman_run_streaming(&run_args)
+                .context("Failed to execute podman run command")?;
+
+            if !status.success() {
+                return Err(anyhow!(
+                    "Podman run failed with exit code: {:?}",
+                    status.code()
+                ));
+            }
+            status.success()
+        };
+
+        if !success {
+            return Err(anyhow!("Run process failed unexpectedly"));
         }
 
         Ok(())
@@ -121,14 +144,36 @@ impl ContainerRunner {
         self.validate_bootc_available()?;
 
         let args = vec!["upgrade".to_string()];
-        let output = self
-            .executor
-            .bootc(&args)
-            .context("Failed to execute bootc upgrade")?;
+        let success = if self.config.quiet {
+            // Use regular execution to capture output when quiet
+            let output = self
+                .executor
+                .bootc(&args)
+                .context("Failed to execute bootc upgrade")?;
 
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow!("bootc upgrade failed: {stderr}"));
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                return Err(anyhow!("bootc upgrade failed: {stderr}"));
+            }
+            output.status.success()
+        } else {
+            // Use streaming execution to show live output
+            let status = self
+                .executor
+                .bootc_streaming(&args)
+                .context("Failed to execute bootc upgrade")?;
+
+            if !status.success() {
+                return Err(anyhow!(
+                    "bootc upgrade failed with exit code: {:?}",
+                    status.code()
+                ));
+            }
+            status.success()
+        };
+
+        if !success {
+            return Err(anyhow!("Bootc upgrade process failed unexpectedly"));
         }
 
         self.msg("Update completed successfully");

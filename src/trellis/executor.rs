@@ -4,7 +4,7 @@
 //! command execution, enabling comprehensive testing through mocking.
 
 use anyhow::Result;
-use std::process::Output;
+use std::process::{ExitStatus, Output};
 
 /// Trait for executing external commands.
 ///
@@ -14,8 +14,14 @@ pub trait CommandExecutor: Send + Sync {
     /// Execute a podman build command.
     fn podman_build(&self, args: &[String]) -> Result<Output>;
 
+    /// Execute a podman build command with streaming output.
+    fn podman_build_streaming(&self, args: &[String]) -> Result<ExitStatus>;
+
     /// Execute a podman run command.
     fn podman_run(&self, args: &[String]) -> Result<Output>;
+
+    /// Execute a podman run command with streaming output.
+    fn podman_run_streaming(&self, args: &[String]) -> Result<ExitStatus>;
 
     /// Execute a podman images command.
     fn podman_images(&self, args: &[String]) -> Result<Output>;
@@ -25,6 +31,9 @@ pub trait CommandExecutor: Send + Sync {
 
     /// Execute a bootc command.
     fn bootc(&self, args: &[String]) -> Result<Output>;
+
+    /// Execute a bootc command with streaming output.
+    fn bootc_streaming(&self, args: &[String]) -> Result<ExitStatus>;
 
     /// Execute any generic command.
     fn execute(&self, command: &str, args: &[String]) -> Result<Output>;
@@ -54,12 +63,28 @@ impl CommandExecutor for RealCommandExecutor {
         Ok(output)
     }
 
+    fn podman_build_streaming(&self, args: &[String]) -> Result<ExitStatus> {
+        let status = std::process::Command::new("podman")
+            .arg("build")
+            .args(args)
+            .status()?;
+        Ok(status)
+    }
+
     fn podman_run(&self, args: &[String]) -> Result<Output> {
         let output = std::process::Command::new("podman")
             .arg("run")
             .args(args)
             .output()?;
         Ok(output)
+    }
+
+    fn podman_run_streaming(&self, args: &[String]) -> Result<ExitStatus> {
+        let status = std::process::Command::new("podman")
+            .arg("run")
+            .args(args)
+            .status()?;
+        Ok(status)
     }
 
     fn podman_images(&self, args: &[String]) -> Result<Output> {
@@ -81,6 +106,11 @@ impl CommandExecutor for RealCommandExecutor {
     fn bootc(&self, args: &[String]) -> Result<Output> {
         let output = std::process::Command::new("bootc").args(args).output()?;
         Ok(output)
+    }
+
+    fn bootc_streaming(&self, args: &[String]) -> Result<ExitStatus> {
+        let status = std::process::Command::new("bootc").args(args).status()?;
+        Ok(status)
     }
 
     fn execute(&self, command: &str, args: &[String]) -> Result<Output> {

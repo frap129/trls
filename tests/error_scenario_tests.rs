@@ -27,6 +27,7 @@ fn create_minimal_cli() -> Cli {
         rootfs_base: "scratch".to_string(),
         rootfs_tag: "test-rootfs".to_string(),
         builder_stages: vec![],
+        quiet: false,
     }
 }
 
@@ -47,6 +48,7 @@ fn test_missing_containerfile_error() {
         extra_mounts: vec![],
         rootfs_tag: "test-rootfs".to_string(),
         hooks_dir: None,
+        quiet: false,
     };
 
     let discovery = ContainerfileDiscovery::new(&config);
@@ -128,6 +130,7 @@ fn test_nonexistent_cache_directory_parent() {
         extra_mounts: vec![],
         rootfs_tag: "test-rootfs".to_string(),
         hooks_dir: None,
+        quiet: false,
     };
 
     // This test validates that the cache directory creation logic
@@ -171,6 +174,7 @@ fn test_containerfile_discovery_with_symlinks() {
         extra_mounts: vec![],
         rootfs_tag: "test-rootfs".to_string(),
         hooks_dir: None,
+        quiet: false,
     };
 
     let discovery = ContainerfileDiscovery::new(&config);
@@ -202,6 +206,7 @@ fn test_stage_validation_with_missing_files() {
         extra_mounts: vec![],
         rootfs_tag: "test-rootfs".to_string(),
         hooks_dir: None,
+        quiet: false,
     };
 
     let discovery = ContainerfileDiscovery::new(&config);
@@ -267,6 +272,7 @@ fn test_readonly_cache_directory() {
         extra_mounts: vec![],
         rootfs_tag: "test-rootfs".to_string(),
         hooks_dir: None,
+        quiet: false,
     };
 
     // The builder should detect the readonly cache directory
@@ -302,6 +308,7 @@ fn test_image_filtering_logic() {
         extra_mounts: vec![],
         rootfs_tag: "custom-rootfs".to_string(),
         hooks_dir: None,
+        quiet: false,
     };
 
     let executor = std::sync::Arc::new(RealCommandExecutor::new());

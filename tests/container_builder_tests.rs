@@ -30,6 +30,7 @@ fn create_builder_config(temp_dir: &TempDir) -> TrellisConfig {
         extra_mounts: vec![],
         rootfs_tag: "test-rootfs".to_string(),
         hooks_dir: None,
+        quiet: false,
     }
 }
 
@@ -382,8 +383,8 @@ fn test_build_error_propagation() {
 
     let mut mock_executor = MockCommandExecutor::new();
     mock_executor
-        .expect_podman_build()
-        .returning(|_| Ok(common::mocks::create_failure_output("Podman build failed")));
+        .expect_podman_build_streaming()
+        .returning(|_| Ok(common::mocks::create_failure_status()));
 
     let executor = Arc::new(mock_executor);
     let builder = ContainerBuilder::new(&config, executor);

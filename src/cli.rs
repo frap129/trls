@@ -58,6 +58,10 @@ pub struct Cli {
     /// A comma delimited list of the builder image stages to build
     #[arg(long, value_delimiter = ',')]
     pub builder_stages: Vec<String>,
+
+    /// Suppress output from wrapped commands (podman, bootc)
+    #[arg(short, long)]
+    pub quiet: bool,
 }
 
 #[derive(Subcommand, Clone, Debug)]

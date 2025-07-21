@@ -35,6 +35,7 @@ fn create_error_test_config(temp_dir: &TempDir) -> TrellisConfig {
         extra_mounts: vec![],
         rootfs_tag: "test-rootfs".to_string(),
         hooks_dir: None,
+        quiet: false,
     }
 }
 
@@ -78,8 +79,8 @@ fn test_builder_with_invalid_containerfile_content() {
 
     let config = create_error_test_config(&temp_dir);
     let mut mock = MockCommandExecutor::new();
-    mock.expect_podman_build()
-        .returning(|_| Ok(create_failure_output("Dockerfile syntax error")));
+    mock.expect_podman_build_streaming()
+        .returning(|_| Ok(create_failure_status()));
 
     let executor = Arc::new(mock);
     let builder = ContainerBuilder::new(&config, executor);
@@ -115,7 +116,7 @@ fn test_runner_with_non_existent_command() {
     let mut mock = MockCommandExecutor::new();
     mock.expect_execute()
         .returning(|_, _| Ok(create_success_output("Image exists")));
-    mock.expect_podman_run()
+    mock.expect_podman_run_streaming()
         .returning(|_| Err(anyhow::anyhow!("Command not found")));
 
     let executor = Arc::new(mock);
@@ -185,6 +186,7 @@ fn test_app_with_corrupted_config() {
         rootfs_base: "scratch".to_string(),
         rootfs_tag: "test-rootfs".to_string(),
         builder_stages: vec!["base".to_string()],
+        quiet: false,
     };
 
     let result = TrellisApp::new(cli);
@@ -209,10 +211,12 @@ fn test_trellis_with_all_operations_failing() {
     let config = create_error_test_config(&temp_dir);
 
     let mut mock = MockCommandExecutor::new();
-    mock.expect_podman_build()
+    mock.expect_podman_build_streaming()
         .returning(|_| Err(anyhow::anyhow!("Build failed")));
-    mock.expect_podman_run()
+    mock.expect_podman_run_streaming()
         .returning(|_| Err(anyhow::anyhow!("Run failed")));
+    mock.expect_bootc_streaming()
+        .returning(|_| Err(anyhow::anyhow!("Bootc streaming failed")));
     mock.expect_podman_images()
         .returning(|_| Err(anyhow::anyhow!("Images failed")));
     mock.expect_podman_rmi()
@@ -249,8 +253,8 @@ fn test_builder_with_extremely_long_stage_names() {
 
             // Create mock that expects the long stage name
             let mut mock = MockCommandExecutor::new();
-            mock.expect_podman_build()
-                .returning(|_| Ok(create_success_output("Build completed successfully")));
+            mock.expect_podman_build_streaming()
+                .returning(|_| Ok(create_success_status()));
 
             let executor = Arc::new(mock);
             let builder = ContainerBuilder::new(&config, executor);
@@ -331,8 +335,8 @@ fn test_runner_with_extremely_long_arguments() {
     let mut mock = MockCommandExecutor::new();
     mock.expect_execute()
         .returning(|_, _| Ok(create_success_output("Image exists")));
-    mock.expect_podman_run()
-        .returning(|_| Ok(create_success_output("Command executed")));
+    mock.expect_podman_run_streaming()
+        .returning(|_| Ok(create_success_status()));
 
     let executor = Arc::new(mock);
     let runner = ContainerRunner::new(&config, executor);
@@ -378,6 +382,7 @@ fn test_app_with_invalid_src_directory() {
         rootfs_base: "scratch".to_string(),
         rootfs_tag: "test-rootfs".to_string(),
         builder_stages: vec!["base".to_string()],
+        quiet: false,
     };
 
     let result = TrellisApp::new(cli);
@@ -435,7 +440,7 @@ fn test_error_propagation_chain() {
     let config = create_error_test_config(&temp_dir);
 
     let mut mock = MockCommandExecutor::new();
-    mock.expect_podman_build()
+    mock.expect_podman_build_streaming()
         .returning(|_| Err(anyhow::anyhow!("Low level error").context("Mid level context")));
 
     let executor = Arc::new(mock);

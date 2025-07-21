@@ -27,6 +27,7 @@ fn create_test_cli_with_command(command: Commands) -> Cli {
         rootfs_base: "scratch".to_string(),
         rootfs_tag: "test-rootfs".to_string(),
         builder_stages: vec!["base".to_string()],
+        quiet: false,
     }
 }
 
@@ -93,6 +94,15 @@ fn test_run_command_execution() {
 
 #[test]
 fn test_clean_command_execution() {
+    // Use configuration environment guard to prevent race conditions with other tests
+    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
+
+    // Create temporary empty config file to override system config
+    let temp_config_dir = tempfile::TempDir::new().unwrap();
+    let temp_config_path = temp_config_dir.path().join("trellis.toml");
+    std::fs::write(&temp_config_path, "# Empty test config").unwrap();
+    _config_guard.set_config_path(&temp_config_path.to_string_lossy());
+
     let temp_dir = TempDir::new().unwrap();
 
     let mut cli = create_test_cli_with_command(Commands::Clean);
@@ -270,6 +280,15 @@ fn test_auto_clean_integration() {
 
 #[test]
 fn test_cache_configuration_applied() {
+    // Use configuration environment guard to prevent race conditions with other tests
+    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
+
+    // Create temporary empty config file to override system config
+    let temp_config_dir = tempfile::TempDir::new().unwrap();
+    let temp_config_path = temp_config_dir.path().join("trellis.toml");
+    std::fs::write(&temp_config_path, "# Empty test config").unwrap();
+    _config_guard.set_config_path(&temp_config_path.to_string_lossy());
+
     let temp_dir = TempDir::new().unwrap();
     common::setup_test_containerfiles(&temp_dir, &["base"]);
 

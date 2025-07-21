@@ -24,6 +24,7 @@ fn create_cleaner_config(temp_dir: &TempDir) -> TrellisConfig {
         extra_mounts: vec![],
         rootfs_tag: "test-rootfs".to_string(),
         hooks_dir: None,
+        quiet: false,
     }
 }
 

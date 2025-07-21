@@ -41,10 +41,13 @@ mock! {
 
     impl CommandExecutor for CommandExecutor {
         fn podman_build(&self, args: &[String]) -> Result<Output>;
+        fn podman_build_streaming(&self, args: &[String]) -> Result<ExitStatus>;
         fn podman_run(&self, args: &[String]) -> Result<Output>;
+        fn podman_run_streaming(&self, args: &[String]) -> Result<ExitStatus>;
         fn podman_images(&self, args: &[String]) -> Result<Output>;
         fn podman_rmi(&self, args: &[String]) -> Result<Output>;
         fn bootc(&self, args: &[String]) -> Result<Output>;
+        fn bootc_streaming(&self, args: &[String]) -> Result<ExitStatus>;
         fn execute(&self, command: &str, args: &[String]) -> Result<Output>;
     }
 }
@@ -180,7 +183,7 @@ pub fn create_failure_output(stderr: &str) -> Output {
 }
 
 /// Helper function to create success exit status.
-fn create_success_status() -> ExitStatus {
+pub fn create_success_status() -> ExitStatus {
     // This is a bit hacky but works for testing
     #[cfg(unix)]
     {
@@ -196,7 +199,7 @@ fn create_success_status() -> ExitStatus {
 }
 
 /// Helper function to create failure exit status.
-fn create_failure_status() -> ExitStatus {
+pub fn create_failure_status() -> ExitStatus {
     #[cfg(unix)]
     {
         use std::os::unix::process::ExitStatusExt;
@@ -273,10 +276,20 @@ impl MockScenarios {
             .times(..)
             .returning(|_| Ok(create_success_output("Build completed successfully")));
 
+        // Accept any podman build streaming command (multiple times)
+        mock.expect_podman_build_streaming()
+            .times(..)
+            .returning(|_| Ok(create_success_status()));
+
         // Accept any podman run command (multiple times)
         mock.expect_podman_run()
             .times(..)
             .returning(|_| Ok(create_success_output("Container executed successfully")));
+
+        // Accept any podman run streaming command (multiple times)
+        mock.expect_podman_run_streaming()
+            .times(..)
+            .returning(|_| Ok(create_success_status()));
 
         // Accept any podman images command (multiple times)
         mock.expect_podman_images()
@@ -308,6 +321,19 @@ impl MockScenarios {
             }
         });
 
+        // Accept streaming methods
+        mock.expect_podman_build_streaming()
+            .times(..)
+            .returning(|_| Ok(create_success_status()));
+        
+        mock.expect_podman_run_streaming()
+            .times(..)
+            .returning(|_| Ok(create_success_status()));
+            
+        mock.expect_bootc_streaming()
+            .times(..)
+            .returning(|_| Ok(create_success_status()));
+
         mock
     }
 
@@ -320,10 +346,19 @@ impl MockScenarios {
             .times(..)
             .returning(|_| Ok(create_failure_output("Build failed")));
 
+        // Accept podman build streaming and return failure
+        mock.expect_podman_build_streaming()
+            .times(..)
+            .returning(|_| Ok(create_failure_status()));
+
         // Accept other commands with flexible expectations
         mock.expect_podman_run()
             .times(..)
             .returning(|_| Ok(create_success_output("Container executed successfully")));
+
+        mock.expect_podman_run_streaming()
+            .times(..)
+            .returning(|_| Ok(create_success_status()));
 
         mock.expect_podman_images().times(..).returning(|_| {
             Ok(create_success_output(
@@ -342,6 +377,10 @@ impl MockScenarios {
                 Ok(create_success_output("bootc command executed"))
             }
         });
+
+        mock.expect_bootc_streaming()
+            .times(..)
+            .returning(|_| Ok(create_success_status()));
 
         mock.expect_execute().times(..).returning(|command, args| {
             if command == "podman" && args.len() >= 2 && args[0] == "image" && args[1] == "exists" {
@@ -370,10 +409,18 @@ impl MockScenarios {
             .times(..)
             .returning(|_| Ok(create_success_output("Build completed successfully")));
 
+        mock.expect_podman_build_streaming()
+            .times(..)
+            .returning(|_| Ok(create_success_status()));
+
         // Accept any podman run command (multiple times)
         mock.expect_podman_run()
             .times(..)
             .returning(|_| Ok(create_success_output("Container executed successfully")));
+
+        mock.expect_podman_run_streaming()
+            .times(..)
+            .returning(|_| Ok(create_success_status()));
 
         // Return multiple images for cleanup
         mock.expect_podman_images()
@@ -404,6 +451,10 @@ impl MockScenarios {
                 Ok(create_success_output("Command executed successfully"))
             }
         });
+
+        mock.expect_bootc_streaming()
+            .times(..)
+            .returning(|_| Ok(create_success_status()));
 
         mock
     }

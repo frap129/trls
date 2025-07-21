@@ -27,6 +27,7 @@ fn create_runner_config(temp_dir: &TempDir) -> TrellisConfig {
         extra_mounts: vec![],
         rootfs_tag: "test-rootfs".to_string(),
         hooks_dir: None,
+        quiet: false,
     }
 }
 
@@ -121,8 +122,8 @@ fn test_run_container_execution_failure() {
 
     // But run command fails
     mock_executor
-        .expect_podman_run()
-        .returning(|_| Ok(common::mocks::create_failure_output("Run command failed")));
+        .expect_podman_run_streaming()
+        .returning(|_| Ok(common::mocks::create_failure_status()));
 
     let executor = Arc::new(mock_executor);
     let runner = ContainerRunner::new(&config, executor);
@@ -133,7 +134,7 @@ fn test_run_container_execution_failure() {
     assert!(result
         .unwrap_err()
         .to_string()
-        .contains("Run command failed"));
+        .contains("Podman run failed"));
 }
 
 #[test]
@@ -187,11 +188,11 @@ fn test_run_bootc_upgrade_upgrade_failure() {
 
     // But upgrade fails
     mock_executor
-        .expect_bootc()
+        .expect_bootc_streaming()
         .with(mockall::predicate::function(|args: &[String]| {
             args.len() == 1 && args[0] == "upgrade"
         }))
-        .returning(|_| Ok(create_failure_output("Upgrade failed")));
+        .returning(|_| Ok(create_failure_status()));
 
     let executor = Arc::new(mock_executor);
     let runner = ContainerRunner::new(&config, executor);
@@ -252,8 +253,8 @@ fn test_container_validation_success() {
         .returning(|_, _| Ok(create_success_output("Image exists")));
 
     mock_executor
-        .expect_podman_run()
-        .returning(|_| Ok(create_success_output("Container executed")));
+        .expect_podman_run_streaming()
+        .returning(|_| Ok(create_success_status()));
 
     let executor = Arc::new(mock_executor);
     let runner = ContainerRunner::new(&config, executor);
@@ -298,18 +299,15 @@ fn test_bootc_validation_success() {
 
     let mut mock_executor = MockCommandExecutor::new();
     mock_executor
-        .expect_execute()
-        .with(
-            mockall::predicate::eq("bootc"),
-            mockall::predicate::function(|args: &[String]| {
-                args.len() == 1 && args[0] == "--version"
-            }),
-        )
-        .returning(|_, _| Ok(create_success_output("bootc 1.0.0")));
+        .expect_bootc()
+        .with(mockall::predicate::function(|args: &[String]| {
+            args.len() == 1 && args[0] == "--version"
+        }))
+        .returning(|_| Ok(create_success_output("bootc 1.0.0")));
 
     mock_executor
-        .expect_bootc()
-        .returning(|_| Ok(create_success_output("Upgrade completed")));
+        .expect_bootc_streaming()
+        .returning(|_| Ok(create_success_status()));
 
     let executor = Arc::new(mock_executor);
     let runner = ContainerRunner::new(&config, executor);
@@ -365,11 +363,11 @@ fn test_run_container_with_localhost_prefix() {
 
     // Verify that the run command uses the correct localhost prefix
     mock_executor
-        .expect_podman_run()
+        .expect_podman_run_streaming()
         .with(mockall::predicate::function(|args: &[String]| {
             args.iter().any(|arg| arg.starts_with("localhost/"))
         }))
-        .returning(|_| Ok(create_success_output("Container executed")));
+        .returning(|_| Ok(create_success_status()));
 
     let executor = Arc::new(mock_executor);
     let runner = ContainerRunner::new(&config, executor);

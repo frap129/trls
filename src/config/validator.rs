@@ -158,6 +158,7 @@ mod tests {
             aur_cache: None,
             src_dir: temp_dir.path().to_path_buf(),
             hooks_dir: None,
+            quiet: false,
         };
         (config, temp_dir)
     }

@@ -27,6 +27,7 @@ fn create_test_cli() -> Cli {
         rootfs_base: "scratch".to_string(),
         rootfs_tag: "test-rootfs".to_string(),
         builder_stages: vec![],
+        quiet: false,
     }
 }
 
@@ -45,6 +46,7 @@ fn create_test_config(temp_dir: &TempDir) -> TrellisConfig {
         extra_mounts: vec![],
         rootfs_tag: "test-rootfs".to_string(),
         hooks_dir: None,
+        quiet: false,
     }
 }
 
@@ -312,6 +314,7 @@ fn test_trellis_app_creation() {
         rootfs_base: "scratch".to_string(),
         rootfs_tag: "test-rootfs".to_string(),
         builder_stages: vec![],
+        quiet: false,
     };
 
     let app = TrellisApp::new(cli);
@@ -337,6 +340,7 @@ fn test_auto_clean_config() {
         rootfs_base: "scratch".to_string(),
         rootfs_tag: "test-rootfs".to_string(),
         builder_stages: vec![],
+        quiet: false,
     };
 
     let config = TrellisConfig::new(cli).unwrap();
@@ -394,6 +398,7 @@ fn test_rootfs_base_functionality_first_stage() {
         extra_mounts: vec![],
         rootfs_tag: "test-rootfs".to_string(),
         hooks_dir: None,
+        quiet: false,
     };
 
     let executor = std::sync::Arc::new(RealCommandExecutor::new());
@@ -425,6 +430,7 @@ fn test_rootfs_base_functionality_subsequent_stages() {
         extra_mounts: vec![],
         rootfs_tag: "test-rootfs".to_string(),
         hooks_dir: None,
+        quiet: false,
     };
 
     let executor = std::sync::Arc::new(RealCommandExecutor::new());
@@ -455,6 +461,7 @@ fn test_rootfs_base_with_default_scratch() {
         extra_mounts: vec![],
         rootfs_tag: "test-rootfs".to_string(),
         hooks_dir: None,
+        quiet: false,
     };
 
     let executor = std::sync::Arc::new(RealCommandExecutor::new());
@@ -492,6 +499,7 @@ fn test_rootfs_base_with_custom_images() {
             extra_mounts: vec![],
             rootfs_tag: "test-rootfs".to_string(),
             hooks_dir: None,
+            quiet: false,
         };
 
         let executor = std::sync::Arc::new(RealCommandExecutor::new());

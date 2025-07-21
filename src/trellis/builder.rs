@@ -234,14 +234,33 @@ impl<'a> ContainerBuilder<'a> {
 
             // Execute build using injected executor
             let build_args = builder.build_args();
-            let output = self
-                .executor
-                .podman_build(&build_args)
-                .with_context(|| format!("Failed to build stage: {build_stage}"))?;
+            let success = if self.config.quiet {
+                // Use regular execution to capture output when quiet
+                let output = self
+                    .executor
+                    .podman_build(&build_args)
+                    .with_context(|| format!("Failed to build stage: {build_stage}"))?;
 
-            if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                return Err(anyhow!("Podman build failed with exit code: {:?}. Error: {}. Check podman logs for details. Ensure sufficient disk space and proper permissions.", output.status.code(), stderr));
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    return Err(anyhow!("Podman build failed with exit code: {:?}. Error: {}. Check podman logs for details. Ensure sufficient disk space and proper permissions.", output.status.code(), stderr));
+                }
+                output.status.success()
+            } else {
+                // Use streaming execution to show live output
+                let status = self
+                    .executor
+                    .podman_build_streaming(&build_args)
+                    .with_context(|| format!("Failed to build stage: {build_stage}"))?;
+
+                if !status.success() {
+                    return Err(anyhow!("Podman build failed with exit code: {:?}. Check podman logs for details. Ensure sufficient disk space and proper permissions.", status.code()));
+                }
+                status.success()
+            };
+
+            if !success {
+                return Err(anyhow!("Build process failed unexpectedly"));
             }
 
             last_stage = tag;

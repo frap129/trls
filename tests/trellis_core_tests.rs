@@ -25,6 +25,7 @@ fn create_test_config(temp_dir: &TempDir) -> TrellisConfig {
         extra_mounts: vec![],
         rootfs_tag: "test-rootfs".to_string(),
         hooks_dir: None,
+        quiet: false,
     }
 }
 
@@ -282,7 +283,7 @@ fn test_error_propagation_from_builder() {
 
     let mut mock_executor = MockCommandExecutor::new();
     mock_executor
-        .expect_podman_build()
+        .expect_podman_build_streaming()
         .returning(|_| Err(anyhow::anyhow!("Build command failed")));
 
     let executor = Arc::new(mock_executor);
@@ -307,8 +308,8 @@ fn test_error_propagation_from_cleaner() {
 
     let mut mock_executor = MockCommandExecutor::new();
     mock_executor
-        .expect_podman_build()
-        .returning(|_| Ok(create_success_output("Build successful")));
+        .expect_podman_build_streaming()
+        .returning(|_| Ok(create_success_status()));
     mock_executor
         .expect_podman_images()
         .returning(|_| Err(anyhow::anyhow!("Images command failed")));
@@ -338,7 +339,7 @@ fn test_error_propagation_from_runner() {
         }))
         .returning(|_, _| Ok(create_success_output(""))); // Image exists check passes
     mock_executor
-        .expect_podman_run()
+        .expect_podman_run_streaming()
         .returning(|_| Err(anyhow::anyhow!("Run command failed")));
 
     let executor = Arc::new(mock_executor);
@@ -376,8 +377,8 @@ fn test_update_failure_in_bootc_phase() {
 
     let mut mock_executor = MockCommandExecutor::new();
     mock_executor
-        .expect_podman_build()
-        .returning(|_| Ok(create_success_output("Build successful")));
+        .expect_podman_build_streaming()
+        .returning(|_| Ok(create_success_status()));
     mock_executor.expect_podman_images().returning(|_| {
         Ok(create_success_output(
             "REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\n",
@@ -385,14 +386,16 @@ fn test_update_failure_in_bootc_phase() {
     });
     mock_executor
         .expect_bootc()
-        .times(2) // Called twice: once for --version check, once for upgrade
         .returning(|args| {
             if args.contains(&"--version".to_string()) {
                 Ok(create_success_output("bootc 1.0.0")) // Version check passes
             } else {
-                Err(anyhow::anyhow!("Bootc upgrade failed")) // Upgrade fails
+                Err(anyhow::anyhow!("This should not be called - streaming should be used"))
             }
         });
+    mock_executor
+        .expect_bootc_streaming()
+        .returning(|_| Err(anyhow::anyhow!("Bootc upgrade failed")));
 
     let executor = Arc::new(mock_executor);
     let trellis = Trellis::new(&config, executor);
