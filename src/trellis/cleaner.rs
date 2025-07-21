@@ -1,11 +1,7 @@
 use anyhow::{anyhow, Context, Result};
-use std::{process::Command, sync::Arc};
+use std::sync::Arc;
 
-use super::{
-    common::TrellisMessaging,
-    constants::{commands, containers},
-    executor::CommandExecutor,
-};
+use super::{common::TrellisMessaging, constants::containers, executor::CommandExecutor};
 use crate::config::TrellisConfig;
 
 /// Mode for cleaning container images.
@@ -71,13 +67,13 @@ impl<'a> ImageCleaner<'a> {
             CleanMode::Auto => "intermediate trls-generated",
         };
 
-        let output = Command::new(commands::PODMAN_CMD)
-            .args([
-                commands::IMAGES_SUBCMD,
-                "--format",
-                "{{.Repository}}:{{.Tag}}",
-            ])
-            .output()
+        let args = vec![
+            "--format".to_string(),
+            "{{.Repository}}:{{.Tag}}".to_string(),
+        ];
+        let output = self
+            .executor
+            .podman_images(&args)
             .context("Failed to list podman images")?;
 
         if !output.status.success() {
@@ -175,11 +171,10 @@ impl<'a> ImageCleaner<'a> {
         }
 
         // Try to remove all images in a single command first
-        let mut cmd = Command::new(commands::PODMAN_CMD);
-        cmd.args([commands::RMI_SUBCMD, "-f"]);
-        cmd.args(images);
+        let mut args = vec!["-f".to_string()];
+        args.extend(images.iter().map(|s| s.to_string()));
 
-        match cmd.output() {
+        match self.executor.podman_rmi(&args) {
             Ok(output) if output.status.success() => {
                 self.msg(&format!("Batch removed {} images", images.len()));
                 Ok(images.len() as u32)
@@ -212,9 +207,10 @@ impl<'a> ImageCleaner<'a> {
 
     /// Removes a single image with detailed error reporting.
     fn remove_single_image(&self, image: &str) -> Result<u32> {
-        let output = Command::new(commands::PODMAN_CMD)
-            .args([commands::RMI_SUBCMD, "-f", image])
-            .output()
+        let args = vec!["-f".to_string(), image.to_string()];
+        let output = self
+            .executor
+            .podman_rmi(&args)
             .context("Failed to remove image")?;
 
         if output.status.success() {

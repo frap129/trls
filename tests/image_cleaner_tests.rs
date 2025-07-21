@@ -113,10 +113,11 @@ fn test_clean_with_images_command_failure() {
 
     let result = cleaner.clean_all();
     assert!(result.is_err());
+    // After executor changes, the error is wrapped in context
     assert!(result
         .unwrap_err()
         .to_string()
-        .contains("Images command failed"));
+        .contains("Failed to list podman images"));
 }
 
 #[test]
@@ -138,6 +139,7 @@ fn test_clean_with_rmi_command_failure() {
 
     mock_executor
         .expect_podman_rmi()
+        .times(1..) // Allow multiple calls
         .returning(|_| Err(anyhow::anyhow!("RMI command failed")));
 
     let executor = Arc::new(mock_executor);
@@ -145,10 +147,11 @@ fn test_clean_with_rmi_command_failure() {
 
     let result = cleaner.clean_all();
     assert!(result.is_err());
+    // After executor changes, the error is wrapped in context
     assert!(result
         .unwrap_err()
         .to_string()
-        .contains("RMI command failed"));
+        .contains("Failed to remove image"));
 }
 
 #[test]
