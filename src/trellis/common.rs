@@ -1,7 +1,5 @@
 //! Common utilities and traits shared across trellis modules.
 
-use anyhow::Context;
-
 /// Message constants for consistent user output formatting
 mod messages {
     /// Error message prefix
@@ -60,20 +58,3 @@ impl TrellisMessager {
     }
 }
 
-/// Extension trait for adding podman-specific error context to Results.
-///
-/// This trait provides convenient methods for adding consistent error context
-/// to podman command operations throughout the codebase.
-pub trait PodmanContext<T> {
-    /// Adds standardized context for podman command failures.
-    fn podman_context(self, operation: &str) -> anyhow::Result<T>;
-}
-
-impl<T, E> PodmanContext<T> for Result<T, E>
-where
-    E: std::error::Error + Send + Sync + 'static,
-{
-    fn podman_context(self, operation: &str) -> anyhow::Result<T> {
-        self.with_context(|| format!("Failed to execute podman {operation}"))
-    }
-}
