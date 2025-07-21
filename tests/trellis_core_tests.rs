@@ -5,6 +5,7 @@
 mod common;
 
 use common::mocks::*;
+use mockall::predicate;
 use std::sync::Arc;
 use tempfile::TempDir;
 use trellis::{config::TrellisConfig, trellis::Trellis};
@@ -329,6 +330,12 @@ fn test_error_propagation_from_runner() {
 
     let mut mock_executor = MockCommandExecutor::new();
     mock_executor
+        .expect_execute()
+        .with(predicate::eq("podman"), predicate::function(|args: &[String]| {
+            args.len() >= 2 && args[0] == "image" && args[1] == "exists"
+        }))
+        .returning(|_, _| Ok(create_success_output(""))); // Image exists check passes
+    mock_executor
         .expect_podman_run()
         .returning(|_| Err(anyhow::anyhow!("Run command failed")));
 
@@ -338,10 +345,11 @@ fn test_error_propagation_from_runner() {
     let args = vec!["echo".to_string(), "hello".to_string()];
     let result = trellis.run_rootfs_container(&args);
     assert!(result.is_err());
+    
     assert!(result
         .unwrap_err()
         .to_string()
-        .contains("Run command failed"));
+        .contains("Failed to execute podman run command"));
 }
 
 #[test]
