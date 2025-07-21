@@ -60,6 +60,7 @@ impl TrellisApp {
     }
 
     /// Create TrellisApp with custom executor for testing.
+    #[allow(dead_code)]
     pub fn with_executor(cli: Cli, executor: Arc<dyn CommandExecutor>) -> Result<Self> {
         let command = cli.command.clone();
         let config = TrellisConfig::new(cli)?;
@@ -90,6 +91,7 @@ pub struct Trellis<'a> {
     builder: ContainerBuilder<'a>,
     cleaner: ImageCleaner<'a>,
     runner: ContainerRunner,
+    #[allow(dead_code)]
     executor: Arc<dyn CommandExecutor>,
 }
 
