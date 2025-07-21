@@ -212,6 +212,8 @@ fn test_trellis_with_all_operations_failing() {
         .returning(|_| Err(anyhow::anyhow!("RMI failed")));
     mock.expect_bootc()
         .returning(|_| Err(anyhow::anyhow!("Bootc failed")));
+    mock.expect_execute()
+        .returning(|_, _| Err(anyhow::anyhow!("Execute failed")));
 
     let executor = Arc::new(mock);
     let trellis = Trellis::new(&config, executor);
@@ -228,20 +230,38 @@ fn test_trellis_with_all_operations_failing() {
 fn test_builder_with_extremely_long_stage_names() {
     let temp_dir = TempDir::new().unwrap();
 
-    // Create stage with very long name
-    let long_name = "a".repeat(1000);
+    // Create stage with very long name - limit to 200 chars to avoid OS limits
+    let long_name = "a".repeat(200);
     let containerfile_path = temp_dir.path().join(format!("Containerfile.{long_name}"));
-    fs::write(&containerfile_path, "FROM alpine").unwrap();
 
-    let config = create_error_test_config(&temp_dir);
-    let executor = Arc::new(MockScenarios::all_success());
-    let builder = ContainerBuilder::new(&config, executor);
+    // Try to create the file, but handle OS limits gracefully
+    match fs::write(&containerfile_path, "FROM alpine") {
+        Ok(()) => {
+            // File created successfully, continue with test
+            let config = create_error_test_config(&temp_dir);
 
-    let stages = vec![long_name];
-    let result =
-        builder.build_multistage_container("test", "test-tag", &stages, BuildType::Builder);
-    // Should handle long names (may succeed or fail depending on system limits)
-    // but shouldn't panic
+            // Create mock that expects the long stage name
+            let mut mock = MockCommandExecutor::new();
+            mock.expect_podman_build()
+                .returning(|_| Ok(create_success_output("Build completed successfully")));
+
+            let executor = Arc::new(mock);
+            let builder = ContainerBuilder::new(&config, executor);
+
+            let stages = vec![long_name];
+            let _result =
+                builder.build_multistage_container("test", "test-tag", &stages, BuildType::Builder);
+            // Should handle long names (may succeed or fail depending on system limits)
+            // but shouldn't panic
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::InvalidFilename => {
+            // OS doesn't support this filename length - test passes as we handled it gracefully
+            println!("OS doesn't support long filenames: {e}");
+        }
+        Err(e) => {
+            panic!("Unexpected error creating test file: {e}");
+        }
+    }
 }
 
 #[test]
@@ -364,22 +384,24 @@ fn test_concurrent_scoped_env_vars() {
         thread::sleep(std::time::Duration::from_millis(100));
     });
 
-    // Main thread should not see the scoped value
-    thread::sleep(std::time::Duration::from_millis(50));
-    assert_eq!(std::env::var(test_key).ok(), None);
-
+    // Environment variables are process-global, so the main thread will see the value
+    // Wait for the thread to set the variable
     let thread_value = rx.recv().unwrap();
     assert_eq!(thread_value, "thread_value");
 
+    // Main thread should see the value too (env vars are process-global)
+    assert_eq!(std::env::var(test_key).unwrap(), "thread_value");
+
     handle.join().unwrap();
 
-    // After thread ends, var should be unset
+    // After thread ends and ScopedEnvVar drops, var should be unset
     assert_eq!(std::env::var(test_key).ok(), None);
 }
 
 #[test]
 fn test_error_propagation_chain() {
     let temp_dir = TempDir::new().unwrap();
+    common::setup_test_containerfiles(&temp_dir, &["base"]);
     let config = create_error_test_config(&temp_dir);
 
     let mut mock = MockCommandExecutor::new();
@@ -393,8 +415,22 @@ fn test_error_propagation_chain() {
     assert!(result.is_err());
 
     // Check error chain contains context
-    let error_string = result.unwrap_err().to_string();
-    assert!(error_string.contains("Low level error") || error_string.contains("Mid level context"));
+    let error = result.unwrap_err();
+
+    // Check if context is in the error chain
+    let mut found_context = false;
+    for cause in error.chain() {
+        let cause_string = cause.to_string();
+        if cause_string.contains("Low level error") || cause_string.contains("Mid level context") {
+            found_context = true;
+            break;
+        }
+    }
+
+    assert!(
+        found_context,
+        "Expected to find 'Low level error' or 'Mid level context' in error chain"
+    );
 }
 
 #[test]
