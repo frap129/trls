@@ -408,3 +408,131 @@ fn test_update_failure_in_bootc_phase() {
         .to_string()
         .contains("Failed to execute bootc upgrade"));
 }
+
+#[test]
+fn test_build_with_quiet_mode_success() {
+    let temp_dir = TempDir::new().unwrap();
+    common::setup_test_containerfiles(&temp_dir, &["base", "final"]); // Need both stages
+
+    let mut config = create_test_config(&temp_dir);
+    config.quiet = true; // Test quiet mode path
+
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_podman_build() // Should use non-streaming
+        .times(2) // Two stages
+        .returning(|_| Ok(create_success_output("Build completed")));
+
+    let executor = Arc::new(mock_executor);
+    let trellis = Trellis::new(&config, executor);
+
+    let result = trellis.build_rootfs_container();
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_build_with_quiet_mode_failure() {
+    let temp_dir = TempDir::new().unwrap();
+    common::setup_test_containerfiles(&temp_dir, &["base", "final"]);
+
+    let mut config = create_test_config(&temp_dir);
+    config.quiet = true;
+
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_podman_build()
+        .returning(|_| Ok(create_failure_output("Build failed in quiet mode")));
+
+    let executor = Arc::new(mock_executor);
+    let trellis = Trellis::new(&config, executor);
+
+    let result = trellis.build_rootfs_container();
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("Podman build failed"));
+}
+
+#[test]
+fn test_run_with_quiet_mode_success() {
+    let temp_dir = TempDir::new().unwrap();
+
+    let mut config = create_test_config(&temp_dir);
+    config.quiet = true;
+
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_execute()
+        .returning(|_, _| Ok(create_success_output("Image exists")));
+    mock_executor
+        .expect_podman_run()
+        .returning(|_| Ok(create_success_output("Container executed")));
+
+    let executor = Arc::new(mock_executor);
+    let trellis = Trellis::new(&config, executor);
+
+    let args = vec!["echo".to_string(), "hello".to_string()];
+    let result = trellis.run_rootfs_container(&args);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_run_with_quiet_mode_failure() {
+    let temp_dir = TempDir::new().unwrap();
+
+    let mut config = create_test_config(&temp_dir);
+    config.quiet = true;
+
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_execute()
+        .returning(|_, _| Ok(create_success_output("Image exists")));
+    mock_executor
+        .expect_podman_run()
+        .returning(|_| Ok(create_failure_output("Run failed in quiet mode")));
+
+    let executor = Arc::new(mock_executor);
+    let trellis = Trellis::new(&config, executor);
+
+    let args = vec!["echo".to_string(), "hello".to_string()];
+    let result = trellis.run_rootfs_container(&args);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("Podman run failed"));
+}
+
+#[test]
+fn test_update_with_quiet_mode_success() {
+    let temp_dir = TempDir::new().unwrap();
+    common::setup_test_containerfiles(&temp_dir, &["base", "final"]);
+
+    let mut config = create_test_config(&temp_dir);
+    config.quiet = true;
+
+    let mut mock_executor = MockCommandExecutor::new();
+    // Build operations in quiet mode
+    mock_executor
+        .expect_podman_build()
+        .times(2) // Two stages
+        .returning(|_| Ok(create_success_output("Build completed")));
+    // Images listing
+    mock_executor.expect_podman_images().returning(|_| {
+        Ok(create_success_output(
+            "REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\n",
+        ))
+    });
+    // Bootc operations in quiet mode
+    mock_executor
+        .expect_bootc()
+        .times(2) // Version check + upgrade
+        .returning(|args| {
+            if args.contains(&"--version".to_string()) {
+                Ok(create_success_output("bootc 1.0.0"))
+            } else {
+                Ok(create_success_output("Upgrade completed"))
+            }
+        });
+
+    let executor = Arc::new(mock_executor);
+    let trellis = Trellis::new(&config, executor);
+
+    let result = trellis.update();
+    assert!(result.is_ok());
+}

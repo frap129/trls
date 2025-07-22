@@ -398,3 +398,99 @@ fn test_run_container_error_message_includes_build_hint() {
     assert!(error_message.contains("Container image not found"));
     assert!(error_message.contains("Run 'trls build' first"));
 }
+
+#[test]
+fn test_run_container_quiet_mode() {
+    let temp_dir = TempDir::new().unwrap();
+    let mut config = create_runner_config(&temp_dir);
+    config.quiet = true;
+
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_execute()
+        .returning(|_, _| Ok(create_success_output("Image exists")));
+    mock_executor
+        .expect_podman_run() // Should use non-streaming
+        .returning(|_| Ok(create_success_output("Container executed")));
+
+    let executor = Arc::new(mock_executor);
+    let runner = ContainerRunner::new(&config, executor);
+
+    let args = vec!["echo".to_string(), "hello".to_string()];
+    let result = runner.run_container("test-rootfs", &args);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_run_container_quiet_mode_error() {
+    let temp_dir = TempDir::new().unwrap();
+    let mut config = create_runner_config(&temp_dir);
+    config.quiet = true;
+
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_execute()
+        .returning(|_, _| Ok(create_success_output("Image exists")));
+    mock_executor
+        .expect_podman_run()
+        .returning(|_| Ok(create_failure_output("Run failed in quiet mode")));
+
+    let executor = Arc::new(mock_executor);
+    let runner = ContainerRunner::new(&config, executor);
+
+    let args = vec!["echo".to_string(), "hello".to_string()];
+    let result = runner.run_container("test-rootfs", &args);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("Podman run failed"));
+}
+
+#[test]  
+fn test_bootc_upgrade_quiet_mode() {
+    let temp_dir = TempDir::new().unwrap();
+    let mut config = create_runner_config(&temp_dir);
+    config.quiet = true;
+
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_bootc()
+        .times(2) // Version check + upgrade
+        .returning(|args| {
+            if args.contains(&"--version".to_string()) {
+                Ok(create_success_output("bootc 1.0.0"))
+            } else {
+                Ok(create_success_output("Upgrade completed"))
+            }
+        });
+
+    let executor = Arc::new(mock_executor);
+    let runner = ContainerRunner::new(&config, executor);
+
+    let result = runner.run_bootc_upgrade();
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_bootc_upgrade_quiet_mode_error() {
+    let temp_dir = TempDir::new().unwrap();
+    let mut config = create_runner_config(&temp_dir);
+    config.quiet = true;
+
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_bootc()
+        .times(2)
+        .returning(|args| {
+            if args.contains(&"--version".to_string()) {
+                Ok(create_success_output("bootc 1.0.0"))
+            } else {
+                Ok(create_failure_output("Upgrade failed in quiet mode"))
+            }
+        });
+
+    let executor = Arc::new(mock_executor);
+    let runner = ContainerRunner::new(&config, executor);
+
+    let result = runner.run_bootc_upgrade();
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("bootc upgrade failed"));
+}

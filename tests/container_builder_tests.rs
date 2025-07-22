@@ -418,3 +418,68 @@ fn test_containerfile_validation_before_build() {
         .to_string()
         .contains("Missing required containerfiles"));
 }
+
+#[test]
+fn test_build_with_quiet_mode() {
+    let temp_dir = TempDir::new().unwrap();
+    common::setup_test_containerfiles(&temp_dir, &["base"]);
+
+    let mut config = create_builder_config(&temp_dir);
+    config.quiet = true; // Test the quiet path
+
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_podman_build() // Should use non-streaming method
+        .returning(|_| Ok(create_success_output("Build completed")));
+
+    let executor = Arc::new(mock_executor);
+    let builder = ContainerBuilder::new(&config, executor);
+
+    let stages = vec!["base".to_string()];
+    let result = builder.build_multistage_container("builder", "test-builder", &stages, BuildType::Builder);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_build_with_quiet_mode_error() {
+    let temp_dir = TempDir::new().unwrap();
+    common::setup_test_containerfiles(&temp_dir, &["base"]);
+
+    let mut config = create_builder_config(&temp_dir);
+    config.quiet = true;
+
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_podman_build()
+        .returning(|_| Ok(create_failure_output("Build failed in quiet mode")));
+
+    let executor = Arc::new(mock_executor);
+    let builder = ContainerBuilder::new(&config, executor);
+
+    let stages = vec!["base".to_string()];
+    let result = builder.build_multistage_container("builder", "test-builder", &stages, BuildType::Builder);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("Podman build failed"));
+}
+
+#[test]
+fn test_build_with_quiet_mode_multistage() {
+    let temp_dir = TempDir::new().unwrap();
+    common::setup_test_containerfiles(&temp_dir, &["base", "final"]);
+
+    let mut config = create_builder_config(&temp_dir);
+    config.quiet = true;
+
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_podman_build()
+        .times(2) // Two stages
+        .returning(|_| Ok(create_success_output("Build completed")));
+
+    let executor = Arc::new(mock_executor);
+    let builder = ContainerBuilder::new(&config, executor);
+
+    let stages = vec!["base".to_string(), "final".to_string()];
+    let result = builder.build_multistage_container("rootfs", "test-rootfs", &stages, BuildType::Rootfs);
+    assert!(result.is_ok());
+}

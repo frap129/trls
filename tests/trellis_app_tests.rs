@@ -339,3 +339,145 @@ fn test_custom_rootfs_base() {
     let result = app.run();
     assert!(result.is_ok());
 }
+
+#[test]
+fn test_build_command_with_quiet_flag() {
+    // Use configuration environment guard to prevent race conditions with other tests
+    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
+
+    // Create temporary empty config file to override system config
+    let temp_config_dir = tempfile::TempDir::new().unwrap();
+    let temp_config_path = temp_config_dir.path().join("trellis.toml");
+    std::fs::write(&temp_config_path, "# Empty test config").unwrap();
+    _config_guard.set_config_path(&temp_config_path.to_string_lossy());
+
+    let temp_dir = TempDir::new().unwrap();
+    common::setup_test_containerfiles(&temp_dir, &["base"]);
+
+    let mut cli = create_test_cli_with_command(Commands::Build);
+    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.quiet = true; // Test CLI quiet flag
+
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_podman_build() // Should use non-streaming
+        .returning(|_| Ok(create_success_output("Build completed")));
+
+    let executor = Arc::new(mock_executor);
+    let app = TrellisApp::with_executor(cli, executor).unwrap();
+
+    let result = app.run();
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_build_builder_command_with_quiet_flag() {
+    // Use configuration environment guard to prevent race conditions with other tests
+    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
+
+    // Create temporary empty config file to override system config
+    let temp_config_dir = tempfile::TempDir::new().unwrap();
+    let temp_config_path = temp_config_dir.path().join("trellis.toml");
+    std::fs::write(&temp_config_path, "# Empty test config").unwrap();
+    _config_guard.set_config_path(&temp_config_path.to_string_lossy());
+
+    let temp_dir = TempDir::new().unwrap();
+    common::setup_test_containerfiles(&temp_dir, &["base"]);
+
+    let mut cli = create_test_cli_with_command(Commands::BuildBuilder);
+    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.quiet = true;
+
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_podman_build()
+        .returning(|_| Ok(create_success_output("Build completed")));
+
+    let executor = Arc::new(mock_executor);
+    let app = TrellisApp::with_executor(cli, executor).unwrap();
+
+    let result = app.run();
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_run_command_with_quiet_flag() {
+    // Use configuration environment guard to prevent race conditions with other tests
+    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
+
+    // Create temporary empty config file to override system config
+    let temp_config_dir = tempfile::TempDir::new().unwrap();
+    let temp_config_path = temp_config_dir.path().join("trellis.toml");
+    std::fs::write(&temp_config_path, "# Empty test config").unwrap();
+    _config_guard.set_config_path(&temp_config_path.to_string_lossy());
+
+    let temp_dir = TempDir::new().unwrap();
+
+    let mut cli = create_test_cli_with_command(Commands::Run {
+        args: vec!["echo".to_string(), "hello".to_string()],
+    });
+    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.quiet = true;
+
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_execute()
+        .returning(|_, _| Ok(create_success_output("Image exists")));
+    mock_executor
+        .expect_podman_run()
+        .returning(|_| Ok(create_success_output("Container executed")));
+
+    let executor = Arc::new(mock_executor);
+    let app = TrellisApp::with_executor(cli, executor).unwrap();
+
+    let result = app.run();
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_update_command_with_quiet_flag() {
+    // Use configuration environment guard to prevent race conditions with other tests
+    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
+
+    // Create temporary empty config file to override system config
+    let temp_config_dir = tempfile::TempDir::new().unwrap();
+    let temp_config_path = temp_config_dir.path().join("trellis.toml");
+    std::fs::write(&temp_config_path, "# Empty test config").unwrap();
+    _config_guard.set_config_path(&temp_config_path.to_string_lossy());
+
+    let temp_dir = TempDir::new().unwrap();
+    common::setup_test_containerfiles(&temp_dir, &["base"]);
+
+    let mut cli = create_test_cli_with_command(Commands::Update);
+    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.quiet = true;
+
+    let mut mock_executor = MockCommandExecutor::new();
+    // Build stage
+    mock_executor
+        .expect_podman_build()
+        .returning(|_| Ok(create_success_output("Build completed")));
+    // Images listing
+    mock_executor.expect_podman_images().returning(|_| {
+        Ok(create_success_output(
+            "REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\n",
+        ))
+    });
+    // Bootc operations
+    mock_executor
+        .expect_bootc()
+        .times(2) // Version check + upgrade
+        .returning(|args| {
+            if args.contains(&"--version".to_string()) {
+                Ok(create_success_output("bootc 1.0.0"))
+            } else {
+                Ok(create_success_output("Upgrade completed"))
+            }
+        });
+
+    let executor = Arc::new(mock_executor);
+    let app = TrellisApp::with_executor(cli, executor).unwrap();
+
+    let result = app.run();
+    assert!(result.is_ok());
+}
