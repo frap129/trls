@@ -4,7 +4,7 @@
 
 mod common;
 
-use common::mocks::*;
+use common::{mocks::*, TestVariation};
 use std::sync::Arc;
 use tempfile::TempDir;
 use trellis::{
@@ -41,16 +41,38 @@ fn test_container_runner_creation() {
     // Test passes if no panic occurs during creation
 }
 
-#[test]
-fn test_run_container_success() {
+fn test_run_container_success_impl(variation: TestVariation) {
     let temp_dir = TempDir::new().unwrap();
-    let config = create_runner_config(&temp_dir);
-    let executor = Arc::new(MockScenarios::all_success());
-    let runner = ContainerRunner::new(&config, executor);
+    let mut config = create_runner_config(&temp_dir);
+    variation.apply_to_config(&mut config);
 
+    let executor = if variation.quiet {
+        let mut mock_executor = MockCommandExecutor::new();
+        mock_executor
+            .expect_execute()
+            .returning(|_, _| Ok(create_success_output("Image exists")));
+        mock_executor
+            .expect_podman_run()
+            .returning(|_| Ok(create_success_output("Container executed")));
+        Arc::new(mock_executor)
+    } else {
+        Arc::new(MockScenarios::all_success())
+    };
+
+    let runner = ContainerRunner::new(&config, executor);
     let args = vec!["echo".to_string(), "hello".to_string()];
     let result = runner.run_container("test-rootfs", &args);
     assert!(result.is_ok());
+}
+
+#[test]
+fn test_run_container_success_standard() {
+    test_run_container_success_impl(TestVariation::standard());
+}
+
+#[test]
+fn test_run_container_success_quiet() {
+    test_run_container_success_impl(TestVariation::quiet());
 }
 
 #[test]
@@ -137,15 +159,135 @@ fn test_run_container_execution_failure() {
         .contains("Podman run failed"));
 }
 
-#[test]
-fn test_run_bootc_upgrade_success() {
+fn test_run_bootc_upgrade_success_impl(variation: TestVariation) {
     let temp_dir = TempDir::new().unwrap();
-    let config = create_runner_config(&temp_dir);
-    let executor = Arc::new(MockScenarios::all_success());
-    let runner = ContainerRunner::new(&config, executor);
+    let mut config = create_runner_config(&temp_dir);
+    variation.apply_to_config(&mut config);
 
+    let executor = if variation.quiet {
+        let mut mock_executor = MockCommandExecutor::new();
+        mock_executor
+            .expect_bootc()
+            .times(2) // Version check + upgrade
+            .returning(|args| {
+                if args.contains(&"--version".to_string()) {
+                    Ok(create_success_output("bootc 1.0.0"))
+                } else {
+                    Ok(create_success_output("Upgrade completed"))
+                }
+            });
+        Arc::new(mock_executor)
+    } else {
+        Arc::new(MockScenarios::all_success())
+    };
+
+    let runner = ContainerRunner::new(&config, executor);
     let result = runner.run_bootc_upgrade();
     assert!(result.is_ok());
+}
+
+#[test]
+fn test_run_bootc_upgrade_success_standard() {
+    test_run_bootc_upgrade_success_impl(TestVariation::standard());
+}
+
+#[test]
+fn test_run_bootc_upgrade_success_quiet() {
+    test_run_bootc_upgrade_success_impl(TestVariation::quiet());
+}
+
+fn test_run_container_failure_impl(variation: TestVariation) {
+    let temp_dir = TempDir::new().unwrap();
+    let mut config = create_runner_config(&temp_dir);
+    variation.apply_to_config(&mut config);
+
+    let executor = if variation.quiet {
+        let mut mock_executor = MockCommandExecutor::new();
+        mock_executor
+            .expect_execute()
+            .returning(|_, _| Ok(create_success_output("Image exists")));
+        mock_executor
+            .expect_podman_run()
+            .returning(|_| Ok(create_failure_output("Run failed")));
+        Arc::new(mock_executor)
+    } else {
+        let mut mock_executor = MockCommandExecutor::new();
+        mock_executor
+            .expect_execute()
+            .with(
+                mockall::predicate::eq("podman"),
+                mockall::predicate::function(|args: &[String]| {
+                    args.len() >= 3 && args[0] == "image" && args[1] == "exists"
+                }),
+            )
+            .returning(|_, _| Ok(create_success_output("Image exists")));
+        mock_executor
+            .expect_podman_run_streaming()
+            .returning(|_| Ok(create_failure_status()));
+        Arc::new(mock_executor)
+    };
+
+    let runner = ContainerRunner::new(&config, executor);
+    let args = vec!["echo".to_string(), "hello".to_string()];
+    let result = runner.run_container("test-rootfs", &args);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("Podman run failed"));
+}
+
+#[test]
+fn test_run_container_failure_standard() {
+    test_run_container_failure_impl(TestVariation::standard());
+}
+
+#[test]
+fn test_run_container_failure_quiet() {
+    test_run_container_failure_impl(TestVariation::quiet());
+}
+
+fn test_run_bootc_upgrade_failure_impl(variation: TestVariation) {
+    let temp_dir = TempDir::new().unwrap();
+    let mut config = create_runner_config(&temp_dir);
+    variation.apply_to_config(&mut config);
+
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_bootc()
+        .with(mockall::predicate::function(|args: &[String]| {
+            args.len() == 1 && args[0] == "--version"
+        }))
+        .returning(|_| Ok(create_success_output("bootc 1.0.0")));
+    
+    if variation.quiet {
+        mock_executor
+            .expect_bootc()
+            .with(mockall::predicate::function(|args: &[String]| {
+                args.len() == 1 && args[0] == "upgrade"
+            }))
+            .returning(|_| Ok(create_failure_output("Upgrade failed")));
+    } else {
+        mock_executor
+            .expect_bootc_streaming()
+            .with(mockall::predicate::function(|args: &[String]| {
+                args.len() == 1 && args[0] == "upgrade"
+            }))
+            .returning(|_| Ok(create_failure_status()));
+    }
+
+    let executor = Arc::new(mock_executor);
+    let runner = ContainerRunner::new(&config, executor);
+    let result = runner.run_bootc_upgrade();
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("bootc upgrade failed"));
+}
+
+#[test]
+fn test_run_bootc_upgrade_failure_standard() {
+    test_run_bootc_upgrade_failure_impl(TestVariation::standard());
+}
+
+#[test]
+fn test_run_bootc_upgrade_failure_quiet() {
+    test_run_bootc_upgrade_failure_impl(TestVariation::quiet());
 }
 
 #[test]
@@ -399,98 +541,3 @@ fn test_run_container_error_message_includes_build_hint() {
     assert!(error_message.contains("Run 'trls build' first"));
 }
 
-#[test]
-fn test_run_container_quiet_mode() {
-    let temp_dir = TempDir::new().unwrap();
-    let mut config = create_runner_config(&temp_dir);
-    config.quiet = true;
-
-    let mut mock_executor = MockCommandExecutor::new();
-    mock_executor
-        .expect_execute()
-        .returning(|_, _| Ok(create_success_output("Image exists")));
-    mock_executor
-        .expect_podman_run() // Should use non-streaming
-        .returning(|_| Ok(create_success_output("Container executed")));
-
-    let executor = Arc::new(mock_executor);
-    let runner = ContainerRunner::new(&config, executor);
-
-    let args = vec!["echo".to_string(), "hello".to_string()];
-    let result = runner.run_container("test-rootfs", &args);
-    assert!(result.is_ok());
-}
-
-#[test]
-fn test_run_container_quiet_mode_error() {
-    let temp_dir = TempDir::new().unwrap();
-    let mut config = create_runner_config(&temp_dir);
-    config.quiet = true;
-
-    let mut mock_executor = MockCommandExecutor::new();
-    mock_executor
-        .expect_execute()
-        .returning(|_, _| Ok(create_success_output("Image exists")));
-    mock_executor
-        .expect_podman_run()
-        .returning(|_| Ok(create_failure_output("Run failed in quiet mode")));
-
-    let executor = Arc::new(mock_executor);
-    let runner = ContainerRunner::new(&config, executor);
-
-    let args = vec!["echo".to_string(), "hello".to_string()];
-    let result = runner.run_container("test-rootfs", &args);
-    assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Podman run failed"));
-}
-
-#[test]  
-fn test_bootc_upgrade_quiet_mode() {
-    let temp_dir = TempDir::new().unwrap();
-    let mut config = create_runner_config(&temp_dir);
-    config.quiet = true;
-
-    let mut mock_executor = MockCommandExecutor::new();
-    mock_executor
-        .expect_bootc()
-        .times(2) // Version check + upgrade
-        .returning(|args| {
-            if args.contains(&"--version".to_string()) {
-                Ok(create_success_output("bootc 1.0.0"))
-            } else {
-                Ok(create_success_output("Upgrade completed"))
-            }
-        });
-
-    let executor = Arc::new(mock_executor);
-    let runner = ContainerRunner::new(&config, executor);
-
-    let result = runner.run_bootc_upgrade();
-    assert!(result.is_ok());
-}
-
-#[test]
-fn test_bootc_upgrade_quiet_mode_error() {
-    let temp_dir = TempDir::new().unwrap();
-    let mut config = create_runner_config(&temp_dir);
-    config.quiet = true;
-
-    let mut mock_executor = MockCommandExecutor::new();
-    mock_executor
-        .expect_bootc()
-        .times(2)
-        .returning(|args| {
-            if args.contains(&"--version".to_string()) {
-                Ok(create_success_output("bootc 1.0.0"))
-            } else {
-                Ok(create_failure_output("Upgrade failed in quiet mode"))
-            }
-        });
-
-    let executor = Arc::new(mock_executor);
-    let runner = ContainerRunner::new(&config, executor);
-
-    let result = runner.run_bootc_upgrade();
-    assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("bootc upgrade failed"));
-}

@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
+use trellis::config::TrellisConfig;
 
 pub mod isolation;
 pub mod mocks;
@@ -102,4 +103,36 @@ pub fn assert_file_contains(path: &Path, content: &str) {
         path.display(),
         content
     );
+}
+
+/// Test parameter configuration for flag-based variations
+#[derive(Clone, Debug)]
+pub struct TestVariation {
+    pub quiet: bool,
+    pub auto_clean: bool,
+    pub podman_build_cache: bool,
+}
+
+impl TestVariation {
+    pub fn standard() -> Self {
+        Self {
+            quiet: false,
+            auto_clean: false,
+            podman_build_cache: false,
+        }
+    }
+
+    pub fn quiet() -> Self {
+        Self {
+            quiet: true,
+            auto_clean: false,
+            podman_build_cache: false,
+        }
+    }
+
+    pub fn apply_to_config(&self, config: &mut TrellisConfig) {
+        config.quiet = self.quiet;
+        config.auto_clean = self.auto_clean;
+        config.podman_build_cache = self.podman_build_cache;
+    }
 }
