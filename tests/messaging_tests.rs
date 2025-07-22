@@ -1,32 +1,6 @@
 //! Tests for the TrellisMessaging trait and TrellisMessager implementation.
 
-use std::io::{self, Write};
-use std::sync::{Arc, Mutex};
 use trellis::trellis::common::{TrellisMessager, TrellisMessaging};
-
-/// Test helper to capture stdout output
-struct StdoutCapture {
-    buffer: Arc<Mutex<Vec<u8>>>,
-}
-
-impl StdoutCapture {
-    fn new() -> Self {
-        Self {
-            buffer: Arc::new(Mutex::new(Vec::new())),
-        }
-    }
-
-    fn capture<F>(&self, f: F) -> String
-    where
-        F: FnOnce(),
-    {
-        // Unfortunately, capturing stdout/stderr in tests is complex in Rust.
-        // We'll test the messaging functionality by verifying the methods exist
-        // and can be called without panicking.
-        f();
-        String::new() // Placeholder - actual output capture would require more complex setup
-    }
-}
 
 #[cfg(test)]
 mod trellis_messaging_trait_tests {

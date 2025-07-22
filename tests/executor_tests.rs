@@ -1,7 +1,5 @@
 //! Tests for the CommandExecutor trait and RealCommandExecutor implementation.
 
-use anyhow::Result;
-use std::process::{ExitStatus, Output};
 use trellis::trellis::executor::{CommandExecutor, RealCommandExecutor};
 
 #[cfg(test)]
