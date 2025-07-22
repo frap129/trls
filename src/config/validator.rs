@@ -226,4 +226,106 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("cannot be empty"));
     }
+
+    #[test]
+    fn test_validate_cross_dependencies_empty_rootfs_tag() {
+        let (mut config, _temp_dir) = create_test_config();
+        config.rootfs_tag = "".to_string();
+
+        let result = ConfigValidator::validate_cross_dependencies(&config);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("cannot be empty"));
+    }
+
+    #[test]
+    fn test_validate_stages_unknown_type() {
+        let stages = vec!["stage1".to_string()];
+        let result = ConfigValidator::validate_stages(&stages, "unknown");
+        assert!(result.is_ok()); // Should still pass for unknown stage types
+    }
+
+    #[test]
+    fn test_validate_stages_empty_unknown_type() {
+        let result = ConfigValidator::validate_stages(&[], "unknown");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("No stages defined"));
+    }
+
+    #[test]
+    fn test_validate_paths_src_dir_is_file() {
+        use std::fs::File;
+        
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("not_a_directory");
+        File::create(&file_path).unwrap();
+        
+        let (mut config, _temp_dir) = create_test_config();
+        config.src_dir = file_path;
+
+        let result = ConfigValidator::validate_paths(&config);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not a directory"));
+    }
+
+    #[test]
+    fn test_validate_paths_pacman_cache_parent_not_exists() {
+        let (mut config, _temp_dir) = create_test_config();
+        config.pacman_cache = Some(PathBuf::from("/nonexistent/parent/cache"));
+
+        let result = ConfigValidator::validate_paths(&config);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Pacman cache parent directory does not exist"));
+    }
+
+    #[test]
+    fn test_validate_paths_aur_cache_parent_not_exists() {
+        let (mut config, _temp_dir) = create_test_config();
+        config.aur_cache = Some(PathBuf::from("/nonexistent/parent/cache"));
+
+        let result = ConfigValidator::validate_paths(&config);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("AUR cache parent directory does not exist"));
+    }
+
+    #[test]
+    fn test_validate_paths_cache_dirs_with_valid_parents() {
+        let temp_dir = TempDir::new().unwrap();
+        let (mut config, _temp_dir) = create_test_config();
+        
+        // Set cache directories with existing parent
+        config.pacman_cache = Some(temp_dir.path().join("pacman_cache"));
+        config.aur_cache = Some(temp_dir.path().join("aur_cache"));
+
+        let result = ConfigValidator::validate_paths(&config);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_paths_cache_dirs_none() {
+        let (mut config, _temp_dir) = create_test_config();
+        config.pacman_cache = None;
+        config.aur_cache = None;
+
+        let result = ConfigValidator::validate_paths(&config);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_complete_with_path_error() {
+        let (mut config, _temp_dir) = create_test_config();
+        config.src_dir = PathBuf::from("/nonexistent/path");
+
+        let result = ConfigValidator::validate_complete(&config);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_complete_with_cross_dependency_error() {
+        let (mut config, _temp_dir) = create_test_config();
+        config.builder_tag = "same".to_string();
+        config.rootfs_tag = "same".to_string();
+
+        let result = ConfigValidator::validate_complete(&config);
+        assert!(result.is_err());
+    }
 }

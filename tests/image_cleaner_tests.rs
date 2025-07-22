@@ -375,3 +375,178 @@ fn format_images_output(images: &[MockImageInfo]) -> String {
     }
     output
 }
+
+#[test]
+fn test_batch_removal_with_fallback_to_individual() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = create_cleaner_config(&temp_dir);
+
+    // Create multiple trellis images
+    let images = vec![
+        MockImageInfo::new("abc123", "localhost/test-builder", "latest"),
+        MockImageInfo::new("def456", "localhost/trellis-stage-base", "latest"),
+    ];
+    let images_output = format_images_output(&images);
+
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_podman_images()
+        .returning(move |_| Ok(create_success_output(&images_output)));
+
+    // First call (batch) fails, then individual calls succeed
+    let mut call_count = 0;
+    mock_executor
+        .expect_podman_rmi()
+        .times(3) // 1 batch + 2 individual
+        .returning(move |args| {
+            call_count += 1;
+            if call_count == 1 && args.len() > 2 {
+                // Batch call fails
+                Ok(create_failure_output("Batch removal failed"))
+            } else {
+                // Individual calls succeed
+                Ok(create_success_output("Image removed"))
+            }
+        });
+
+    let executor = Arc::new(mock_executor);
+    let cleaner = ImageCleaner::new(&config, executor);
+
+    let result = cleaner.clean_all();
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_single_image_removal_success() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = create_cleaner_config(&temp_dir);
+
+    // Only one image to remove
+    let images = vec![
+        MockImageInfo::new("abc123", "localhost/trellis-stage-base", "latest"),
+    ];
+    let images_output = format_images_output(&images);
+
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_podman_images()
+        .returning(move |_| Ok(create_success_output(&images_output)));
+
+    mock_executor
+        .expect_podman_rmi()
+        .times(1)
+        .returning(|_| Ok(create_success_output("Image removed")));
+
+    let executor = Arc::new(mock_executor);
+    let cleaner = ImageCleaner::new(&config, executor);
+
+    let result = cleaner.clean_all();
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_single_image_removal_failure() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = create_cleaner_config(&temp_dir);
+
+    // Only one image to remove
+    let images = vec![
+        MockImageInfo::new("abc123", "localhost/trellis-stage-base", "latest"),
+    ];
+    let images_output = format_images_output(&images);
+
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_podman_images()
+        .returning(move |_| Ok(create_success_output(&images_output)));
+
+    mock_executor
+        .expect_podman_rmi()
+        .times(1)
+        .returning(|_| Ok(create_failure_output("Image removal failed")));
+
+    let executor = Arc::new(mock_executor);
+    let cleaner = ImageCleaner::new(&config, executor);
+
+    let result = cleaner.clean_all();
+    assert!(result.is_ok()); // Should handle gracefully and continue
+}
+
+#[test]
+fn test_batch_removal_command_error_fallback() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = create_cleaner_config(&temp_dir);
+
+    // Create multiple trellis images
+    let images = vec![
+        MockImageInfo::new("abc123", "localhost/test-builder", "latest"),
+        MockImageInfo::new("def456", "localhost/trellis-stage-base", "latest"),
+    ];
+    let images_output = format_images_output(&images);
+
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_podman_images()
+        .returning(move |_| Ok(create_success_output(&images_output)));
+
+    // First call (batch) fails with command error, then individual calls succeed
+    let mut call_count = 0;
+    mock_executor
+        .expect_podman_rmi()
+        .times(3) // 1 batch + 2 individual
+        .returning(move |args| {
+            call_count += 1;
+            if call_count == 1 && args.len() > 2 {
+                // Batch call fails with command error
+                Err(anyhow::anyhow!("Command execution failed"))
+            } else {
+                // Individual calls succeed
+                Ok(create_success_output("Image removed"))
+            }
+        });
+
+    let executor = Arc::new(mock_executor);
+    let cleaner = ImageCleaner::new(&config, executor);
+
+    let result = cleaner.clean_all();
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_clean_mode_auto_preserves_final_tags() {
+    let temp_dir = TempDir::new().unwrap();
+    let mut config = create_cleaner_config(&temp_dir);
+    config.auto_clean = true;
+
+    // Include both final tags and intermediate images
+    let images = vec![
+        MockImageInfo::new("abc123", "localhost/test-builder", "latest"), // Final tag - should be preserved
+        MockImageInfo::new("def456", "localhost/test-rootfs", "latest"),  // Final tag - should be preserved
+        MockImageInfo::new("ghi789", "localhost/trellis-stage-intermediate", "latest"), // Should be removed
+        MockImageInfo::new("jkl012", "localhost/trellis-builder-temp", "latest"), // Should be removed
+    ];
+    let images_output = format_images_output(&images);
+
+    let mut mock_executor = MockCommandExecutor::new();
+    mock_executor
+        .expect_podman_images()
+        .returning(move |_| Ok(create_success_output(&images_output)));
+
+    // Should only remove intermediate images, not final builder/rootfs tags
+    mock_executor
+        .expect_podman_rmi()
+        .returning(|args| {
+            // In auto mode, should not remove final builder/rootfs images
+            for arg in args {
+                assert!(!arg.contains("localhost/test-builder:latest"));
+                assert!(!arg.contains("localhost/test-rootfs:latest"));
+            }
+            Ok(create_success_output("Images removed"))
+        });
+
+    let executor = Arc::new(mock_executor);
+    let cleaner = ImageCleaner::new(&config, executor);
+
+    let result = cleaner.auto_clean();
+    assert!(result.is_ok());
+}
