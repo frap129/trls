@@ -218,12 +218,6 @@ impl<'a> ContainerfileDiscovery<'a> {
 
         for entry in walker {
             walker_count += 1;
-
-            // Progress reporting for large directory trees
-            if walker_count % 1000 == 0 {
-                self.msg(&format!("Searched {walker_count} directories..."));
-            }
-
             if entry.file_type().is_file() {
                 if let Some(filename) = entry.file_name().to_str() {
                     if let Some(group) = self.extract_group_from_filename(filename) {
