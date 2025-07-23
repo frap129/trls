@@ -201,7 +201,6 @@ impl<'a> ContainerfileDiscovery<'a> {
 
         let mut found = HashMap::new();
         let mut remaining: HashSet<String> = groups.iter().cloned().collect();
-        let mut walker_count = 0;
 
         // Use walkdir for efficient directory traversal
         let walker = WalkDir::new(&self.config.src_dir)
@@ -217,7 +216,6 @@ impl<'a> ContainerfileDiscovery<'a> {
             });
 
         for entry in walker {
-            walker_count += 1;
             if entry.file_type().is_file() {
                 if let Some(filename) = entry.file_name().to_str() {
                     if let Some(group) = self.extract_group_from_filename(filename) {
