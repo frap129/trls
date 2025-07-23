@@ -105,35 +105,7 @@ pub fn assert_file_contains(path: &Path, content: &str) {
     );
 }
 
-/// Creates a standard test configuration with default settings
-pub fn create_standard_config(temp_dir: &TempDir) -> TrellisConfig {
-    TrellisConfig {
-        builder_stages: vec!["base".to_string()],
-        builder_tag: "test-builder".to_string(),
-        podman_build_cache: false,
-        auto_clean: false,
-        pacman_cache: None,
-        aur_cache: None,
-        src_dir: temp_dir.path().to_path_buf(),
-        rootfs_stages: vec!["base".to_string(), "final".to_string()],
-        rootfs_base: "scratch".to_string(),
-        extra_contexts: vec![],
-        extra_mounts: vec![],
-        rootfs_tag: "test-rootfs".to_string(),
-        hooks_dir: None,
-        quiet: false,
-    }
-}
-
-/// Creates a quiet mode test configuration
-pub fn create_quiet_config(temp_dir: &TempDir) -> TrellisConfig {
-    let mut config = create_standard_config(temp_dir);
-    config.quiet = true;
-    config
-}
-
 /// Test parameter configuration for flag-based variations
-#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct TestVariation {
     pub quiet: bool,
