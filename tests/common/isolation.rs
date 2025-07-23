@@ -85,7 +85,7 @@ impl Default for IsolatedEnvironment {
 static CONFIG_ENV_LOCK: Mutex<()> = Mutex::new(());
 
 /// RAII guard for serializing access to TRELLIS_CONFIG environment variable.
-/// 
+///
 /// This ensures that only one test can manipulate the TRELLIS_CONFIG environment
 /// variable at a time, preventing race conditions during concurrent test execution.
 pub struct ConfigEnvGuard {
@@ -95,25 +95,25 @@ pub struct ConfigEnvGuard {
 
 impl ConfigEnvGuard {
     /// Acquire exclusive access to TRELLIS_CONFIG environment variable.
-    /// 
+    ///
     /// This will block until no other test is manipulating the config environment.
     #[allow(dead_code)]
     pub fn acquire() -> Self {
         let guard = CONFIG_ENV_LOCK.lock().expect("Config env lock poisoned");
         let original_value = env::var("TRELLIS_CONFIG").ok();
-        
+
         Self {
             _guard: guard,
             original_value,
         }
     }
-    
+
     /// Set TRELLIS_CONFIG to a specific value.
     #[allow(dead_code)]
     pub fn set_config_path(&self, path: &str) {
         env::set_var("TRELLIS_CONFIG", path);
     }
-    
+
     /// Remove TRELLIS_CONFIG environment variable.
     #[allow(dead_code)]
     pub fn remove_config_env(&self) {

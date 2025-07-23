@@ -330,7 +330,10 @@ impl<'a> ContainerfileDiscovery<'a> {
         let mut missing_files = Vec::new();
         for containerfile_name in &containerfile_names {
             if !found_files.contains_key(containerfile_name) {
-                missing_files.push(format!("{}{containerfile_name}", patterns::CONTAINERFILE_PREFIX));
+                missing_files.push(format!(
+                    "{}{containerfile_name}",
+                    patterns::CONTAINERFILE_PREFIX
+                ));
             }
         }
 

@@ -90,7 +90,6 @@ fn test_determine_base_image_custom_rootfs_base() {
     assert_eq!(base_image, "fedora:39");
 }
 
-
 fn test_build_single_stage_container_impl(variation: TestVariation) {
     let temp_dir = TempDir::new().unwrap();
     common::setup_test_containerfiles(&temp_dir, &["base"]);
@@ -147,7 +146,10 @@ fn test_build_single_stage_container_failure_impl(variation: TestVariation) {
     let result =
         builder.build_multistage_container("builder", "test-builder", &stages, BuildType::Builder);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Podman build failed"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Podman build failed"));
 }
 
 #[test]
@@ -445,7 +447,7 @@ fn test_build_stage_tagging_multistage_syntax() {
     let stages = vec!["gpu:base".to_string(), "gpu:cuda".to_string()];
     let result =
         builder.build_multistage_container("builder", "final-tag", &stages, BuildType::Builder);
-    // Multistage discovery is now fixed - both stages use the same Containerfile.gpu  
+    // Multistage discovery is now fixed - both stages use the same Containerfile.gpu
     assert!(result.is_ok());
 }
 
@@ -493,4 +495,3 @@ fn test_containerfile_validation_before_build() {
         .to_string()
         .contains("Missing required containerfiles"));
 }
-

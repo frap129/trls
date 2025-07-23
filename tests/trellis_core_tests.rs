@@ -201,7 +201,10 @@ fn test_build_rootfs_container_failure_impl(variation: TestVariation) {
     let trellis = Trellis::new(&config, executor);
     let result = trellis.build_rootfs_container();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Podman build failed"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Podman build failed"));
 }
 
 #[test]
@@ -244,7 +247,10 @@ fn test_run_rootfs_container_failure_impl(variation: TestVariation) {
     let args = vec!["echo".to_string(), "hello".to_string()];
     let result = trellis.run_rootfs_container(&args);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Podman run failed"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Podman run failed"));
 }
 
 #[test]
@@ -447,7 +453,7 @@ fn test_error_propagation_from_builder() {
 
     let result = trellis.build_builder_container();
     assert!(result.is_err());
-    
+
     assert!(result
         .unwrap_err()
         .to_string()
@@ -475,7 +481,7 @@ fn test_error_propagation_from_cleaner() {
 
     let result = trellis.build_builder_container();
     assert!(result.is_err());
-    
+
     assert!(result
         .unwrap_err()
         .to_string()
@@ -490,9 +496,12 @@ fn test_error_propagation_from_runner() {
     let mut mock_executor = MockCommandExecutor::new();
     mock_executor
         .expect_execute()
-        .with(predicate::eq("podman"), predicate::function(|args: &[String]| {
-            args.len() >= 2 && args[0] == "image" && args[1] == "exists"
-        }))
+        .with(
+            predicate::eq("podman"),
+            predicate::function(|args: &[String]| {
+                args.len() >= 2 && args[0] == "image" && args[1] == "exists"
+            }),
+        )
         .returning(|_, _| Ok(create_success_output(""))); // Image exists check passes
     mock_executor
         .expect_podman_run_streaming()
@@ -504,7 +513,7 @@ fn test_error_propagation_from_runner() {
     let args = vec!["echo".to_string(), "hello".to_string()];
     let result = trellis.run_rootfs_container(&args);
     assert!(result.is_err());
-    
+
     assert!(result
         .unwrap_err()
         .to_string()
@@ -540,15 +549,15 @@ fn test_update_failure_in_bootc_phase() {
             "REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\n",
         ))
     });
-    mock_executor
-        .expect_bootc()
-        .returning(|args| {
-            if args.contains(&"--version".to_string()) {
-                Ok(create_success_output("bootc 1.0.0")) // Version check passes
-            } else {
-                Err(anyhow::anyhow!("This should not be called - streaming should be used"))
-            }
-        });
+    mock_executor.expect_bootc().returning(|args| {
+        if args.contains(&"--version".to_string()) {
+            Ok(create_success_output("bootc 1.0.0")) // Version check passes
+        } else {
+            Err(anyhow::anyhow!(
+                "This should not be called - streaming should be used"
+            ))
+        }
+    });
     mock_executor
         .expect_bootc_streaming()
         .returning(|_| Err(anyhow::anyhow!("Bootc upgrade failed")));
@@ -558,10 +567,9 @@ fn test_update_failure_in_bootc_phase() {
 
     let result = trellis.update();
     assert!(result.is_err());
-    
+
     assert!(result
         .unwrap_err()
         .to_string()
         .contains("Failed to execute bootc upgrade"));
 }
-

@@ -248,17 +248,20 @@ mod tests {
     fn test_validate_stages_empty_unknown_type() {
         let result = ConfigValidator::validate_stages(&[], "unknown");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("No stages defined"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("No stages defined"));
     }
 
     #[test]
     fn test_validate_paths_src_dir_is_file() {
         use std::fs::File;
-        
+
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("not_a_directory");
         File::create(&file_path).unwrap();
-        
+
         let (mut config, _temp_dir) = create_test_config();
         config.src_dir = file_path;
 
@@ -274,7 +277,10 @@ mod tests {
 
         let result = ConfigValidator::validate_paths(&config);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Pacman cache parent directory does not exist"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Pacman cache parent directory does not exist"));
     }
 
     #[test]
@@ -284,14 +290,17 @@ mod tests {
 
         let result = ConfigValidator::validate_paths(&config);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("AUR cache parent directory does not exist"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("AUR cache parent directory does not exist"));
     }
 
     #[test]
     fn test_validate_paths_cache_dirs_with_valid_parents() {
         let temp_dir = TempDir::new().unwrap();
         let (mut config, _temp_dir) = create_test_config();
-        
+
         // Set cache directories with existing parent
         config.pacman_cache = Some(temp_dir.path().join("pacman_cache"));
         config.aur_cache = Some(temp_dir.path().join("aur_cache"));

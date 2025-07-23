@@ -43,7 +43,7 @@ fn test_containerfile_discovery_nested_structure() {
         &temp_dir,
         &[
             ("base", "base"),
-            ("features", "gpu"),  // Creates features/Containerfile.features
+            ("features", "gpu"), // Creates features/Containerfile.features
             ("desktops", "hyprland"),
         ],
     );

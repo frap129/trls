@@ -137,4 +137,3 @@ impl TestVariation {
         config.podman_build_cache = self.podman_build_cache;
     }
 }
-

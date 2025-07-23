@@ -422,9 +422,11 @@ fn test_single_image_removal_success() {
     let config = create_cleaner_config(&temp_dir);
 
     // Only one image to remove
-    let images = vec![
-        MockImageInfo::new("abc123", "localhost/trellis-stage-base", "latest"),
-    ];
+    let images = vec![MockImageInfo::new(
+        "abc123",
+        "localhost/trellis-stage-base",
+        "latest",
+    )];
     let images_output = format_images_output(&images);
 
     let mut mock_executor = MockCommandExecutor::new();
@@ -450,9 +452,11 @@ fn test_single_image_removal_failure() {
     let config = create_cleaner_config(&temp_dir);
 
     // Only one image to remove
-    let images = vec![
-        MockImageInfo::new("abc123", "localhost/trellis-stage-base", "latest"),
-    ];
+    let images = vec![MockImageInfo::new(
+        "abc123",
+        "localhost/trellis-stage-base",
+        "latest",
+    )];
     let images_output = format_images_output(&images);
 
     let mut mock_executor = MockCommandExecutor::new();
@@ -521,7 +525,7 @@ fn test_clean_mode_auto_preserves_final_tags() {
     // Include both final tags and intermediate images
     let images = vec![
         MockImageInfo::new("abc123", "localhost/test-builder", "latest"), // Final tag - should be preserved
-        MockImageInfo::new("def456", "localhost/test-rootfs", "latest"),  // Final tag - should be preserved
+        MockImageInfo::new("def456", "localhost/test-rootfs", "latest"), // Final tag - should be preserved
         MockImageInfo::new("ghi789", "localhost/trellis-stage-intermediate", "latest"), // Should be removed
         MockImageInfo::new("jkl012", "localhost/trellis-builder-temp", "latest"), // Should be removed
     ];
@@ -533,16 +537,14 @@ fn test_clean_mode_auto_preserves_final_tags() {
         .returning(move |_| Ok(create_success_output(&images_output)));
 
     // Should only remove intermediate images, not final builder/rootfs tags
-    mock_executor
-        .expect_podman_rmi()
-        .returning(|args| {
-            // In auto mode, should not remove final builder/rootfs images
-            for arg in args {
-                assert!(!arg.contains("localhost/test-builder:latest"));
-                assert!(!arg.contains("localhost/test-rootfs:latest"));
-            }
-            Ok(create_success_output("Images removed"))
-        });
+    mock_executor.expect_podman_rmi().returning(|args| {
+        // In auto mode, should not remove final builder/rootfs images
+        for arg in args {
+            assert!(!arg.contains("localhost/test-builder:latest"));
+            assert!(!arg.contains("localhost/test-rootfs:latest"));
+        }
+        Ok(create_success_output("Images removed"))
+    });
 
     let executor = Arc::new(mock_executor);
     let cleaner = ImageCleaner::new(&config, executor);

@@ -57,7 +57,6 @@ pub mod patterns {
     pub const MAX_SEARCH_DEPTH: usize = 20;
 }
 
-
 /// Common error messages
 pub mod errors {
     /// No rootfs stages defined error
@@ -71,5 +70,4 @@ pub mod errors {
 
     /// Containerfile not found error
     pub const CONTAINERFILE_NOT_FOUND: &str = "Containerfile not found";
-
 }

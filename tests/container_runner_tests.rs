@@ -231,7 +231,10 @@ fn test_run_container_failure_impl(variation: TestVariation) {
     let args = vec!["echo".to_string(), "hello".to_string()];
     let result = runner.run_container("test-rootfs", &args);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Podman run failed"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Podman run failed"));
 }
 
 #[test]
@@ -256,7 +259,7 @@ fn test_run_bootc_upgrade_failure_impl(variation: TestVariation) {
             args.len() == 1 && args[0] == "--version"
         }))
         .returning(|_| Ok(create_success_output("bootc 1.0.0")));
-    
+
     if variation.quiet {
         mock_executor
             .expect_bootc()
@@ -277,7 +280,10 @@ fn test_run_bootc_upgrade_failure_impl(variation: TestVariation) {
     let runner = ContainerRunner::new(&config, executor);
     let result = runner.run_bootc_upgrade();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("bootc upgrade failed"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("bootc upgrade failed"));
 }
 
 #[test]
@@ -540,4 +546,3 @@ fn test_run_container_error_message_includes_build_hint() {
     assert!(error_message.contains("Container image not found"));
     assert!(error_message.contains("Run 'trls build' first"));
 }
-

@@ -272,7 +272,11 @@ fn test_validate_stages_nested_syntax_missing() {
     let config = create_discovery_config(&temp_dir);
     let discovery = ContainerfileDiscovery::new(&config);
 
-    let stages = vec!["gpu:base".to_string(), "gpu:cuda".to_string(), "cpu:v1".to_string()];
+    let stages = vec![
+        "gpu:base".to_string(),
+        "gpu:cuda".to_string(),
+        "cpu:v1".to_string(),
+    ];
     let result = discovery.validate_stages(&stages);
     assert!(result.is_err());
     let error_message = result.unwrap_err().to_string();

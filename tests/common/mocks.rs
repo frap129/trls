@@ -325,11 +325,11 @@ impl MockScenarios {
         mock.expect_podman_build_streaming()
             .times(..)
             .returning(|_| Ok(create_success_status()));
-        
+
         mock.expect_podman_run_streaming()
             .times(..)
             .returning(|_| Ok(create_success_status()));
-            
+
         mock.expect_bootc_streaming()
             .times(..)
             .returning(|_| Ok(create_success_status()));
