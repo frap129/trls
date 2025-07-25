@@ -227,7 +227,8 @@ fn test_trellis_with_all_operations_failing() {
         .returning(|_, _| Err(anyhow::anyhow!("Execute failed")));
 
     let executor = Arc::new(mock);
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
 
     // All operations should fail gracefully
     assert!(trellis.build_builder_container().is_err());
@@ -444,7 +445,8 @@ fn test_error_propagation_chain() {
         .returning(|_| Err(anyhow::anyhow!("Low level error").context("Mid level context")));
 
     let executor = Arc::new(mock);
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
 
     let result = trellis.build_builder_container();
     assert!(result.is_err());

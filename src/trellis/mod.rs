@@ -6,7 +6,7 @@
 //! - `runner`: Container execution
 //! - `discovery`: Containerfile discovery logic
 
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 use std::sync::Arc;
 
 use crate::{
@@ -16,6 +16,43 @@ use crate::{
 
 use common::TrellisMessaging;
 use executor::{CommandExecutor, RealCommandExecutor};
+use std::io::{self, BufRead};
+
+/// Trait for handling user interactions like prompts and confirmations.
+/// This allows for dependency injection and mocking in tests.
+pub trait UserInteraction: Send + Sync {
+    /// Prompts the user with a yes/no question.
+    ///
+    /// # Arguments
+    ///
+    /// * `message` - The prompt message to display to the user
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(true)` if the user responds affirmatively (y/yes)
+    /// * `Ok(false)` if the user responds negatively or with any other input
+    /// * `Err` if there's an error reading input
+    fn prompt_yes_no(&self, message: &str) -> Result<bool>;
+}
+
+/// Real implementation of UserInteraction that reads from stdin.
+pub struct RealUserInteraction;
+
+impl UserInteraction for RealUserInteraction {
+    fn prompt_yes_no(&self, message: &str) -> Result<bool> {
+        eprint!("{message}");
+
+        let stdin = io::stdin();
+        let mut handle = stdin.lock();
+        let mut input = String::new();
+        handle
+            .read_line(&mut input)
+            .context("Failed to read user input")?;
+
+        let response = input.trim().to_lowercase();
+        Ok(response == "y" || response == "yes")
+    }
+}
 
 pub mod builder;
 pub mod cleaner;
@@ -73,7 +110,17 @@ impl TrellisApp {
     }
 
     pub fn run(&self) -> Result<()> {
-        let trellis = Trellis::new(&self.config, Arc::clone(&self.executor));
+        let user_interaction = Arc::new(RealUserInteraction);
+        self.run_with_user_interaction(user_interaction)
+    }
+
+    /// Run with custom user interaction for testing.
+    #[allow(dead_code)]
+    pub fn run_with_user_interaction(
+        &self,
+        user_interaction: Arc<dyn UserInteraction>,
+    ) -> Result<()> {
+        let trellis = Trellis::new(&self.config, Arc::clone(&self.executor), user_interaction);
 
         match &self.command {
             Commands::BuildBuilder => trellis.build_builder_container(),
@@ -93,18 +140,24 @@ pub struct Trellis<'a> {
     runner: ContainerRunner<'a>,
     #[allow(dead_code)]
     executor: Arc<dyn CommandExecutor>,
+    user_interaction: Arc<dyn UserInteraction>,
 }
 
 impl<'a> TrellisMessaging for Trellis<'a> {}
 
 impl<'a> Trellis<'a> {
-    pub fn new(config: &'a TrellisConfig, executor: Arc<dyn CommandExecutor>) -> Self {
+    pub fn new(
+        config: &'a TrellisConfig,
+        executor: Arc<dyn CommandExecutor>,
+        user_interaction: Arc<dyn UserInteraction>,
+    ) -> Self {
         Trellis {
             config,
             builder: ContainerBuilder::new(config, Arc::clone(&executor)),
             cleaner: ImageCleaner::new(config, Arc::clone(&executor)),
             runner: ContainerRunner::new(config, Arc::clone(&executor)),
             executor,
+            user_interaction,
         }
     }
 
@@ -128,6 +181,23 @@ impl<'a> Trellis<'a> {
 
     pub fn build_rootfs_container(&self) -> Result<()> {
         ConfigValidator::validate_stages(&self.config.rootfs_stages, "rootfs")?;
+
+        // Check if builder container exists before building rootfs
+        if !self.check_builder_container_exists()? {
+            self.warning(&format!(
+                "Builder container '{}' not found",
+                self.config.builder_tag
+            ));
+            self.warning("The builder container is required for rootfs builds");
+
+            if self
+                .user_interaction
+                .prompt_yes_no("Would you like to build it now? [y/N]: ")?
+            {
+                self.msg("Building builder container...");
+                self.build_builder_container()?;
+            }
+        }
 
         self.builder.build_multistage_container(
             "stage",
@@ -155,5 +225,40 @@ impl<'a> Trellis<'a> {
     pub fn update(&self) -> Result<()> {
         self.build_rootfs_container()?;
         self.runner.run_bootc_upgrade()
+    }
+
+    /// Checks if the builder container exists using podman images.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(true)` if the builder container exists
+    /// * `Ok(false)` if the builder container does not exist
+    /// * `Err` if the podman command fails
+    pub fn check_builder_container_exists(&self) -> Result<bool> {
+        let args = vec![
+            "--filter".to_string(),
+            format!("reference=localhost/{}", self.config.builder_tag),
+            "--format".to_string(),
+            "{{.Repository}}:{{.Tag}}".to_string(),
+        ];
+
+        let output = self
+            .executor
+            .podman_images(&args)
+            .context("Failed to check if builder container exists")?;
+
+        if !output.status.success() {
+            return Err(anyhow!(
+                "Podman images command failed with exit code: {:?}",
+                output.status.code()
+            ));
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let expected_prefix = format!("localhost/{}:", self.config.builder_tag);
+
+        Ok(stdout
+            .lines()
+            .any(|line| line.trim().starts_with(&expected_prefix)))
     }
 }

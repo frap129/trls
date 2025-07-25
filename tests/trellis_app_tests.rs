@@ -86,9 +86,10 @@ fn test_run_command_execution() {
     cli.src_dir = Some(temp_dir.path().to_path_buf());
 
     let executor = Arc::new(MockScenarios::all_success());
+    let user_interaction = Arc::new(MockUserInteractionScenarios::never_called());
     let app = TrellisApp::with_executor(cli, executor).unwrap();
 
-    let result = app.run();
+    let result = app.run_with_user_interaction(user_interaction);
     assert!(result.is_ok());
 }
 
@@ -362,11 +363,26 @@ fn test_build_command_with_quiet_flag() {
     mock_executor
         .expect_podman_build() // Should use non-streaming
         .returning(|_| Ok(create_success_output("Build completed")));
+    // Add expectation for builder container check
+    mock_executor.expect_podman_images().returning(|args| {
+        if args.iter().any(|arg| arg.contains("--filter"))
+            && args
+                .iter()
+                .any(|arg| arg.contains("reference=localhost/test-builder"))
+        {
+            Ok(create_success_output("localhost/test-builder:latest\n"))
+        } else {
+            Ok(create_success_output(
+                "REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\n",
+            ))
+        }
+    });
 
     let executor = Arc::new(mock_executor);
+    let user_interaction = Arc::new(MockUserInteractionScenarios::never_called());
     let app = TrellisApp::with_executor(cli, executor).unwrap();
 
-    let result = app.run();
+    let result = app.run_with_user_interaction(user_interaction);
     assert!(result.is_ok());
 }
 
@@ -392,11 +408,26 @@ fn test_build_builder_command_with_quiet_flag() {
     mock_executor
         .expect_podman_build()
         .returning(|_| Ok(create_success_output("Build completed")));
+    // Add expectation for builder container check
+    mock_executor.expect_podman_images().returning(|args| {
+        if args.iter().any(|arg| arg.contains("--filter"))
+            && args
+                .iter()
+                .any(|arg| arg.contains("reference=localhost/test-builder"))
+        {
+            Ok(create_success_output("localhost/test-builder:latest\n"))
+        } else {
+            Ok(create_success_output(
+                "REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\n",
+            ))
+        }
+    });
 
     let executor = Arc::new(mock_executor);
+    let user_interaction = Arc::new(MockUserInteractionScenarios::never_called());
     let app = TrellisApp::with_executor(cli, executor).unwrap();
 
-    let result = app.run();
+    let result = app.run_with_user_interaction(user_interaction);
     assert!(result.is_ok());
 }
 
@@ -428,9 +459,10 @@ fn test_run_command_with_quiet_flag() {
         .returning(|_| Ok(create_success_output("Container executed")));
 
     let executor = Arc::new(mock_executor);
+    let user_interaction = Arc::new(MockUserInteractionScenarios::never_called());
     let app = TrellisApp::with_executor(cli, executor).unwrap();
 
-    let result = app.run();
+    let result = app.run_with_user_interaction(user_interaction);
     assert!(result.is_ok());
 }
 
@@ -457,11 +489,19 @@ fn test_update_command_with_quiet_flag() {
     mock_executor
         .expect_podman_build()
         .returning(|_| Ok(create_success_output("Build completed")));
-    // Images listing
-    mock_executor.expect_podman_images().returning(|_| {
-        Ok(create_success_output(
-            "REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\n",
-        ))
+    // Images listing and builder container check
+    mock_executor.expect_podman_images().returning(|args| {
+        if args.iter().any(|arg| arg.contains("--filter"))
+            && args
+                .iter()
+                .any(|arg| arg.contains("reference=localhost/test-builder"))
+        {
+            Ok(create_success_output("localhost/test-builder:latest\n"))
+        } else {
+            Ok(create_success_output(
+                "REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\n",
+            ))
+        }
     });
     // Bootc operations
     mock_executor
@@ -476,8 +516,9 @@ fn test_update_command_with_quiet_flag() {
         });
 
     let executor = Arc::new(mock_executor);
+    let user_interaction = Arc::new(MockUserInteractionScenarios::never_called());
     let app = TrellisApp::with_executor(cli, executor).unwrap();
 
-    let result = app.run();
+    let result = app.run_with_user_interaction(user_interaction);
     assert!(result.is_ok());
 }

@@ -1,6 +1,9 @@
+mod common;
+
 use std::fs;
 use tempfile::TempDir;
 
+use common::mocks::create_default_user_interaction;
 use trellis::{
     cli::{Cli, Commands},
     config::{Config, TrellisConfig},
@@ -354,7 +357,8 @@ fn test_build_rootfs_container_no_stages() {
     config.rootfs_stages = vec![];
 
     let executor = std::sync::Arc::new(RealCommandExecutor::new());
-    let trellis = trellis::Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = trellis::Trellis::new(&config, executor, user_interaction);
     let result = trellis.build_rootfs_container();
 
     assert!(result.is_err());
@@ -371,7 +375,8 @@ fn test_build_builder_container_no_stages() {
     config.builder_stages = vec![];
 
     let executor = std::sync::Arc::new(RealCommandExecutor::new());
-    let trellis = trellis::Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = trellis::Trellis::new(&config, executor, user_interaction);
     let result = trellis.build_builder_container();
 
     assert!(result.is_err());

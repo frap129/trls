@@ -10,6 +10,7 @@ use std::process::{ExitStatus, Output};
 
 // Re-export the trait and real implementation for testing
 pub use trellis::trellis::executor::CommandExecutor;
+pub use trellis::trellis::UserInteraction;
 
 /// Mock image information for testing.
 #[derive(Debug, Clone, PartialEq)]
@@ -49,6 +50,15 @@ mock! {
         fn bootc(&self, args: &[String]) -> Result<Output>;
         fn bootc_streaming(&self, args: &[String]) -> Result<ExitStatus>;
         fn execute(&self, command: &str, args: &[String]) -> Result<Output>;
+    }
+}
+
+// Generate mock for the UserInteraction trait
+mock! {
+    pub UserInteraction {}
+
+    impl UserInteraction for UserInteraction {
+        fn prompt_yes_no(&self, message: &str) -> Result<bool>;
     }
 }
 
@@ -266,6 +276,10 @@ impl TestEnvironment {
 /// Collection of pre-configured mock scenarios for common test cases.
 pub struct MockScenarios;
 
+/// Collection of pre-configured user interaction mock scenarios.
+#[allow(dead_code)]
+pub struct MockUserInteractionScenarios;
+
 impl MockScenarios {
     /// Scenario: All operations succeed.
     pub fn all_success() -> MockCommandExecutor {
@@ -292,9 +306,20 @@ impl MockScenarios {
             .returning(|_| Ok(create_success_status()));
 
         // Accept any podman images command (multiple times)
+        // Return appropriate format based on the arguments
         mock.expect_podman_images()
             .times(..)
-            .returning(|_| Ok(create_success_output("REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\nlocalhost/test-builder\tlatest\tabc123\t2024-01-01T00:00:00Z\t100MB\nlocalhost/test-rootfs\tlatest\tdef456\t2024-01-01T00:00:00Z\t100MB\n")));
+            .returning(|args| {
+                // Check if this is a builder container existence check
+                if args.iter().any(|arg| arg.contains("--filter")) && 
+                   args.iter().any(|arg| arg.contains("reference=localhost/test-builder")) {
+                    // Return the expected format for builder container check
+                    Ok(create_success_output("localhost/test-builder:latest\n"))
+                } else {
+                    // Return tabular format for general image listing
+                    Ok(create_success_output("REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\nlocalhost/test-builder\tlatest\tabc123\t2024-01-01T00:00:00Z\t100MB\nlocalhost/test-rootfs\tlatest\tdef456\t2024-01-01T00:00:00Z\t100MB\n"))
+                }
+            });
 
         // Accept any podman rmi command (multiple times)
         mock.expect_podman_rmi()
@@ -360,10 +385,21 @@ impl MockScenarios {
             .times(..)
             .returning(|_| Ok(create_success_status()));
 
-        mock.expect_podman_images().times(..).returning(|_| {
-            Ok(create_success_output(
-                "REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\n",
-            ))
+        mock.expect_podman_images().times(..).returning(|args| {
+            // Check if this is a builder container existence check
+            if args.iter().any(|arg| arg.contains("--filter"))
+                && args
+                    .iter()
+                    .any(|arg| arg.contains("reference=localhost/test-builder"))
+            {
+                // Return the expected format for builder container check
+                Ok(create_success_output("localhost/test-builder:latest\n"))
+            } else {
+                // Return empty list for other calls
+                Ok(create_success_output(
+                    "REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\n",
+                ))
+            }
         });
 
         mock.expect_podman_rmi()
@@ -422,10 +458,20 @@ impl MockScenarios {
             .times(..)
             .returning(|_| Ok(create_success_status()));
 
-        // Return multiple images for cleanup
+        // Return multiple images for cleanup and handle builder container check
         mock.expect_podman_images()
             .times(..)
-            .returning(|_| Ok(create_success_output("REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\nlocalhost/test-builder\tlatest\tabc123\t2024-01-01T00:00:00Z\t100MB\nlocalhost/test-rootfs\tlatest\tdef456\t2024-01-01T00:00:00Z\t100MB\nlocalhost/test-builder\tintermediate\tghi789\t2024-01-01T00:00:00Z\t100MB\nlocalhost/test-rootfs\tintermediate\tjkl012\t2024-01-01T00:00:00Z\t100MB\n")));
+            .returning(|args| {
+                // Check if this is a builder container existence check
+                if args.iter().any(|arg| arg.contains("--filter")) && 
+                   args.iter().any(|arg| arg.contains("reference=localhost/test-builder")) {
+                    // Return the expected format for builder container check
+                    Ok(create_success_output("localhost/test-builder:latest\n"))
+                } else {
+                    // Return multiple images for cleanup testing
+                    Ok(create_success_output("REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\nlocalhost/test-builder\tlatest\tabc123\t2024-01-01T00:00:00Z\t100MB\nlocalhost/test-rootfs\tlatest\tdef456\t2024-01-01T00:00:00Z\t100MB\nlocalhost/test-builder\tintermediate\tghi789\t2024-01-01T00:00:00Z\t100MB\nlocalhost/test-rootfs\tintermediate\tjkl012\t2024-01-01T00:00:00Z\t100MB\n"))
+                }
+            });
 
         // Accept any podman rmi command (multiple times)
         mock.expect_podman_rmi()
@@ -456,6 +502,53 @@ impl MockScenarios {
             .times(..)
             .returning(|_| Ok(create_success_status()));
 
+        mock
+    }
+}
+
+/// Helper function to create a default user interaction mock for standard tests.
+/// This creates a mock that expects never to be called, suitable for tests where
+/// the builder container should exist.
+#[allow(dead_code)]
+pub fn create_default_user_interaction() -> std::sync::Arc<MockUserInteraction> {
+    std::sync::Arc::new(MockUserInteractionScenarios::never_called())
+}
+
+impl MockUserInteractionScenarios {
+    /// User interaction that always says "yes" to prompts.
+    #[allow(dead_code)]
+    pub fn always_yes() -> MockUserInteraction {
+        let mut mock = MockUserInteraction::new();
+        mock.expect_prompt_yes_no()
+            .times(..)
+            .returning(|_| Ok(true));
+        mock
+    }
+
+    /// User interaction that always says "no" to prompts.
+    #[allow(dead_code)]
+    pub fn always_no() -> MockUserInteraction {
+        let mut mock = MockUserInteraction::new();
+        mock.expect_prompt_yes_no()
+            .times(..)
+            .returning(|_| Ok(false));
+        mock
+    }
+
+    /// User interaction that is never called (for tests where builder exists).
+    pub fn never_called() -> MockUserInteraction {
+        let mut mock = MockUserInteraction::new();
+        mock.expect_prompt_yes_no().times(0);
+        mock
+    }
+
+    /// User interaction that fails with an error.
+    #[allow(dead_code)]
+    pub fn error() -> MockUserInteraction {
+        let mut mock = MockUserInteraction::new();
+        mock.expect_prompt_yes_no()
+            .times(..)
+            .returning(|_| Err(anyhow::anyhow!("Failed to read user input")));
         mock
     }
 }

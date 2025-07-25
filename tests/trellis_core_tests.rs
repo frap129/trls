@@ -35,7 +35,8 @@ fn test_trellis_creation() {
     let config = create_test_config(&temp_dir);
     let executor = Arc::new(MockScenarios::all_success());
 
-    let _trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let _trellis = Trellis::new(&config, executor, user_interaction);
     // Test passes if no panic occurs during creation
 }
 
@@ -46,7 +47,8 @@ fn test_build_builder_container_success() {
 
     let config = create_test_config(&temp_dir);
     let executor = Arc::new(MockScenarios::all_success());
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
 
     let result = trellis.build_builder_container();
     assert!(result.is_ok());
@@ -65,12 +67,26 @@ fn test_build_rootfs_container_success_impl(variation: TestVariation) {
             .expect_podman_build()
             .times(2) // Two stages
             .returning(|_| Ok(create_success_output("Build completed")));
+        mock_executor.expect_podman_images().returning(|args| {
+            if args.iter().any(|arg| arg.contains("--filter"))
+                && args
+                    .iter()
+                    .any(|arg| arg.contains("reference=localhost/test-builder"))
+            {
+                Ok(create_success_output("localhost/test-builder:latest\n"))
+            } else {
+                Ok(create_success_output(
+                    "REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\n",
+                ))
+            }
+        });
         Arc::new(mock_executor)
     } else {
         Arc::new(MockScenarios::all_success())
     };
 
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
     let result = trellis.build_rootfs_container();
     assert!(result.is_ok());
 }
@@ -103,7 +119,8 @@ fn test_run_rootfs_container_success_impl(variation: TestVariation) {
         Arc::new(MockScenarios::all_success())
     };
 
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
     let args = vec!["echo".to_string(), "hello".to_string()];
     let result = trellis.run_rootfs_container(&args);
     assert!(result.is_ok());
@@ -124,7 +141,8 @@ fn test_clean_operation() {
     let temp_dir = TempDir::new().unwrap();
     let config = create_test_config(&temp_dir);
     let executor = Arc::new(MockScenarios::multiple_images());
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
 
     let result = trellis.clean();
     assert!(result.is_ok());
@@ -144,11 +162,19 @@ fn test_update_operation_success_impl(variation: TestVariation) {
             .expect_podman_build()
             .times(2) // Two stages
             .returning(|_| Ok(create_success_output("Build completed")));
-        // Images listing
-        mock_executor.expect_podman_images().returning(|_| {
-            Ok(create_success_output(
-                "REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\n",
-            ))
+        // Images listing and builder container check
+        mock_executor.expect_podman_images().returning(|args| {
+            if args.iter().any(|arg| arg.contains("--filter"))
+                && args
+                    .iter()
+                    .any(|arg| arg.contains("reference=localhost/test-builder"))
+            {
+                Ok(create_success_output("localhost/test-builder:latest\n"))
+            } else {
+                Ok(create_success_output(
+                    "REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\n",
+                ))
+            }
         });
         // Bootc operations in quiet mode
         mock_executor
@@ -166,7 +192,8 @@ fn test_update_operation_success_impl(variation: TestVariation) {
         Arc::new(MockScenarios::all_success())
     };
 
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
     let result = trellis.update();
     assert!(result.is_ok());
 }
@@ -193,12 +220,26 @@ fn test_build_rootfs_container_failure_impl(variation: TestVariation) {
         mock_executor
             .expect_podman_build()
             .returning(|_| Ok(create_failure_output("Build failed")));
+        mock_executor.expect_podman_images().returning(|args| {
+            if args.iter().any(|arg| arg.contains("--filter"))
+                && args
+                    .iter()
+                    .any(|arg| arg.contains("reference=localhost/test-builder"))
+            {
+                Ok(create_success_output("localhost/test-builder:latest\n"))
+            } else {
+                Ok(create_success_output(
+                    "REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\n",
+                ))
+            }
+        });
         Arc::new(mock_executor)
     } else {
         Arc::new(MockScenarios::build_failures())
     };
 
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
     let result = trellis.build_rootfs_container();
     assert!(result.is_err());
     assert!(result
@@ -243,7 +284,8 @@ fn test_run_rootfs_container_failure_impl(variation: TestVariation) {
         Arc::new(mock_executor)
     };
 
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
     let args = vec!["echo".to_string(), "hello".to_string()];
     let result = trellis.run_rootfs_container(&args);
     assert!(result.is_err());
@@ -270,7 +312,8 @@ fn test_build_builder_with_empty_stages() {
     config.builder_stages = vec![];
 
     let executor = Arc::new(MockScenarios::all_success());
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
 
     let result = trellis.build_builder_container();
     assert!(result.is_err());
@@ -287,7 +330,8 @@ fn test_build_rootfs_with_empty_stages() {
     config.rootfs_stages = vec![];
 
     let executor = Arc::new(MockScenarios::all_success());
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
 
     let result = trellis.build_rootfs_container();
     assert!(result.is_err());
@@ -304,7 +348,8 @@ fn test_build_with_missing_containerfiles() {
 
     let config = create_test_config(&temp_dir);
     let executor = Arc::new(MockScenarios::all_success());
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
 
     let result = trellis.build_builder_container();
     assert!(result.is_err());
@@ -321,7 +366,8 @@ fn test_build_with_command_failures() {
 
     let config = create_test_config(&temp_dir);
     let executor = Arc::new(MockScenarios::build_failures());
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
 
     let result = trellis.build_builder_container();
     assert!(result.is_err());
@@ -336,7 +382,8 @@ fn test_multi_stage_build_coordination() {
     config.rootfs_stages = vec!["base".to_string(), "tools".to_string(), "final".to_string()];
 
     let executor = Arc::new(MockScenarios::all_success());
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
 
     let result = trellis.build_rootfs_container();
     assert!(result.is_ok());
@@ -351,7 +398,8 @@ fn test_auto_clean_integration() {
     config.auto_clean = true;
 
     let executor = Arc::new(MockScenarios::multiple_images());
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
 
     let result = trellis.build_builder_container();
     assert!(result.is_ok());
@@ -367,7 +415,8 @@ fn test_cache_directory_handling() {
     config.aur_cache = Some(temp_dir.path().join("aur"));
 
     let executor = Arc::new(MockScenarios::all_success());
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
 
     let result = trellis.build_builder_container();
     assert!(result.is_ok());
@@ -382,7 +431,8 @@ fn test_custom_rootfs_base_configuration() {
     config.rootfs_base = "fedora:39".to_string();
 
     let executor = Arc::new(MockScenarios::all_success());
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
 
     let result = trellis.build_rootfs_container();
     assert!(result.is_ok());
@@ -397,7 +447,8 @@ fn test_extra_contexts_configuration() {
     config.extra_contexts = vec!["context1=/tmp".to_string(), "context2=/opt".to_string()];
 
     let executor = Arc::new(MockScenarios::all_success());
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
 
     let result = trellis.build_builder_container();
     assert!(result.is_ok());
@@ -415,7 +466,8 @@ fn test_extra_mounts_configuration() {
     ];
 
     let executor = Arc::new(MockScenarios::all_success());
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
 
     let result = trellis.build_builder_container();
     assert!(result.is_ok());
@@ -430,7 +482,8 @@ fn test_podman_build_cache_configuration() {
     config.podman_build_cache = true;
 
     let executor = Arc::new(MockScenarios::all_success());
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
 
     let result = trellis.build_builder_container();
     assert!(result.is_ok());
@@ -449,7 +502,8 @@ fn test_error_propagation_from_builder() {
         .returning(|_| Err(anyhow::anyhow!("Build command failed")));
 
     let executor = Arc::new(mock_executor);
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
 
     let result = trellis.build_builder_container();
     assert!(result.is_err());
@@ -477,7 +531,8 @@ fn test_error_propagation_from_cleaner() {
         .returning(|_| Err(anyhow::anyhow!("Images command failed")));
 
     let executor = Arc::new(mock_executor);
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
 
     let result = trellis.build_builder_container();
     assert!(result.is_err());
@@ -508,7 +563,8 @@ fn test_error_propagation_from_runner() {
         .returning(|_| Err(anyhow::anyhow!("Run command failed")));
 
     let executor = Arc::new(mock_executor);
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
 
     let args = vec!["echo".to_string(), "hello".to_string()];
     let result = trellis.run_rootfs_container(&args);
@@ -527,7 +583,8 @@ fn test_update_failure_in_build_phase() {
 
     let config = create_test_config(&temp_dir);
     let executor = Arc::new(MockScenarios::build_failures());
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
 
     let result = trellis.update();
     assert!(result.is_err());
@@ -544,10 +601,20 @@ fn test_update_failure_in_bootc_phase() {
     mock_executor
         .expect_podman_build_streaming()
         .returning(|_| Ok(create_success_status()));
-    mock_executor.expect_podman_images().returning(|_| {
-        Ok(create_success_output(
-            "REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\n",
-        ))
+    mock_executor.expect_podman_images().returning(|args| {
+        if args.iter().any(|arg| arg.contains("--filter"))
+            && args
+                .iter()
+                .any(|arg| arg.contains("reference=localhost/test-builder"))
+        {
+            // Return builder container exists for the check
+            Ok(create_success_output("localhost/test-builder:latest\n"))
+        } else {
+            // Return empty results for general image listing
+            Ok(create_success_output(
+                "REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\n",
+            ))
+        }
     });
     mock_executor.expect_bootc().returning(|args| {
         if args.contains(&"--version".to_string()) {
@@ -563,7 +630,8 @@ fn test_update_failure_in_bootc_phase() {
         .returning(|_| Err(anyhow::anyhow!("Bootc upgrade failed")));
 
     let executor = Arc::new(mock_executor);
-    let trellis = Trellis::new(&config, executor);
+    let user_interaction = create_default_user_interaction();
+    let trellis = Trellis::new(&config, executor, user_interaction);
 
     let result = trellis.update();
     assert!(result.is_err());
