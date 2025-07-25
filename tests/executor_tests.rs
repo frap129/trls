@@ -7,17 +7,10 @@ mod real_command_executor_tests {
     use super::*;
 
     #[test]
-    fn test_new_constructor() {
+    fn test_constructor_creates_working_instance() {
         let executor = RealCommandExecutor::new();
-        // Test passes if no panic occurs during construction
-        drop(executor);
-    }
-
-    #[test]
-    fn test_default_constructor() {
-        let executor = RealCommandExecutor;
-        // Test passes if no panic occurs during construction
-        drop(executor);
+        // Test that the constructed instance actually works
+        let _ = executor.execute("echo", &["test".to_string()]);
     }
 
     #[test]

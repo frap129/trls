@@ -92,19 +92,10 @@ mod trellis_messager_tests {
     use super::*;
 
     #[test]
-    fn test_new_constructor() {
+    fn test_constructor_creates_working_instance() {
         let messager = TrellisMessager::new();
-
-        // Test that constructor works
-        drop(messager);
-    }
-
-    #[test]
-    fn test_default_constructor() {
-        let messager = TrellisMessager;
-
-        // Test that default constructor works
-        drop(messager);
+        // Test that the constructed instance actually works
+        messager.msg("Constructor test");
     }
 
     #[test]
