@@ -104,12 +104,18 @@ impl CommandExecutor for RealCommandExecutor {
     }
 
     fn bootc(&self, args: &[String]) -> Result<Output> {
-        let output = std::process::Command::new("bootc").args(args).output()?;
+        let output = std::process::Command::new("bootc")
+            .args(args)
+            .env("LC_ALL", "C.UTF-8")
+            .output()?;
         Ok(output)
     }
 
     fn bootc_streaming(&self, args: &[String]) -> Result<ExitStatus> {
-        let status = std::process::Command::new("bootc").args(args).status()?;
+        let status = std::process::Command::new("bootc")
+            .args(args)
+            .env("LC_ALL", "C.UTF-8")
+            .status()?;
         Ok(status)
     }
 
