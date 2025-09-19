@@ -11,7 +11,7 @@ use trellis::{
     cli::{Cli, Commands},
     config::TrellisConfig,
     trellis::{
-        builder::{BuildType, ContainerBuilder, ScopedEnvVar},
+        builder::{BuildType, ContainerBuilder},
         cleaner::ImageCleaner,
         discovery::ContainerfileDiscovery,
         runner::ContainerRunner,
@@ -36,36 +36,6 @@ fn create_error_test_config(temp_dir: &TempDir) -> TrellisConfig {
         rootfs_tag: "test-rootfs".to_string(),
         hooks_dir: None,
         quiet: false,
-    }
-}
-
-#[test]
-fn test_scoped_env_var_new_and_drop() {
-    let test_key = "TRELLIS_TEST_VAR";
-    let original_value = std::env::var(test_key).ok();
-
-    // Clean slate
-    std::env::remove_var(test_key);
-
-    {
-        let _scoped = ScopedEnvVar::new(test_key, "test_value");
-        assert_eq!(std::env::var(test_key).unwrap(), "test_value");
-    } // ScopedEnvVar should restore original state here
-
-    assert_eq!(std::env::var(test_key).ok(), None);
-
-    // Test with existing value
-    std::env::set_var(test_key, "original");
-    {
-        let _scoped = ScopedEnvVar::new(test_key, "temporary");
-        assert_eq!(std::env::var(test_key).unwrap(), "temporary");
-    }
-    assert_eq!(std::env::var(test_key).unwrap(), "original");
-
-    // Cleanup
-    match original_value {
-        Some(val) => std::env::set_var(test_key, val),
-        None => std::env::remove_var(test_key),
     }
 }
 
@@ -161,16 +131,11 @@ fn test_discovery_with_permission_denied() {
 
 #[test]
 fn test_app_with_corrupted_config() {
-    // Use configuration environment guard to prevent race conditions with other tests
-    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
-
     let temp_dir = TempDir::new().unwrap();
     let config_path = temp_dir.path().join("corrupt.toml");
 
     // Write corrupted TOML
     fs::write(&config_path, "invalid toml [[[").unwrap();
-
-    _config_guard.set_config_path(&config_path.to_string_lossy());
 
     let cli = Cli {
         command: Commands::Build,
@@ -187,6 +152,8 @@ fn test_app_with_corrupted_config() {
         rootfs_tag: "test-rootfs".to_string(),
         builder_stages: vec!["base".to_string()],
         quiet: false,
+        config_path: Some(config_path),
+        skip_root_check: false,
     };
 
     let result = TrellisApp::new(cli);
@@ -353,12 +320,6 @@ fn test_runner_with_extremely_long_arguments() {
 
 #[test]
 fn test_app_with_invalid_src_directory() {
-    // Use configuration environment guard to prevent race conditions with other tests
-    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
-
-    // Clear any existing TRELLIS_CONFIG to test directory validation
-    _config_guard.remove_config_env();
-
     let temp_dir = TempDir::new().unwrap();
     let invalid_path = temp_dir.path().join("does_not_exist").join("nested");
 
@@ -384,6 +345,8 @@ fn test_app_with_invalid_src_directory() {
         rootfs_tag: "test-rootfs".to_string(),
         builder_stages: vec!["base".to_string()],
         quiet: false,
+        config_path: None,
+        skip_root_check: false,
     };
 
     let result = TrellisApp::new(cli);
@@ -402,36 +365,6 @@ fn test_app_with_invalid_src_directory() {
         is_expected_error,
         "Expected error message to contain directory or config error, got: '{error_message}'"
     );
-}
-
-#[test]
-fn test_concurrent_scoped_env_vars() {
-    use std::sync::mpsc;
-    use std::thread;
-
-    let test_key = "TRELLIS_CONCURRENT_TEST";
-    std::env::remove_var(test_key);
-
-    let (tx, rx) = mpsc::channel();
-
-    let handle = thread::spawn(move || {
-        let _scoped = ScopedEnvVar::new(test_key, "thread_value");
-        tx.send(std::env::var(test_key).unwrap()).unwrap();
-        thread::sleep(std::time::Duration::from_millis(100));
-    });
-
-    // Environment variables are process-global, so the main thread will see the value
-    // Wait for the thread to set the variable
-    let thread_value = rx.recv().unwrap();
-    assert_eq!(thread_value, "thread_value");
-
-    // Main thread should see the value too (env vars are process-global)
-    assert_eq!(std::env::var(test_key).unwrap(), "thread_value");
-
-    handle.join().unwrap();
-
-    // After thread ends and ScopedEnvVar drops, var should be unset
-    assert_eq!(std::env::var(test_key).ok(), None);
 }
 
 #[test]

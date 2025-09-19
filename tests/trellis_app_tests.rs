@@ -28,6 +28,8 @@ fn create_test_cli_with_command(command: Commands) -> Cli {
         rootfs_tag: "test-rootfs".to_string(),
         builder_stages: vec!["base".to_string()],
         quiet: false,
+        config_path: None,
+        skip_root_check: false,
     }
 }
 
@@ -95,18 +97,15 @@ fn test_run_command_execution() {
 
 #[test]
 fn test_clean_command_execution() {
-    // Use configuration environment guard to prevent race conditions with other tests
-    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
-
     // Create temporary empty config file to override system config
     let temp_config_dir = tempfile::TempDir::new().unwrap();
     let temp_config_path = temp_config_dir.path().join("trellis.toml");
     std::fs::write(&temp_config_path, "# Empty test config").unwrap();
-    _config_guard.set_config_path(&temp_config_path.to_string_lossy());
 
     let temp_dir = TempDir::new().unwrap();
 
     let mut cli = create_test_cli_with_command(Commands::Clean);
+    cli.config_path = Some(temp_config_path);
     cli.src_dir = Some(temp_dir.path().to_path_buf());
 
     let executor = Arc::new(MockScenarios::multiple_images());
@@ -133,18 +132,15 @@ fn test_update_command_execution() {
 
 #[test]
 fn test_build_with_empty_stages_fails() {
-    // Use configuration environment guard to prevent race conditions with other tests
-    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
-
     // Create temporary empty config file to override system config
     let temp_config_dir = tempfile::TempDir::new().unwrap();
     let temp_config_path = temp_config_dir.path().join("trellis.toml");
     std::fs::write(&temp_config_path, "# Empty test config").unwrap();
-    _config_guard.set_config_path(&temp_config_path.to_string_lossy());
 
     let temp_dir = TempDir::new().unwrap();
 
     let mut cli = create_test_cli_with_command(Commands::Build);
+    cli.config_path = Some(temp_config_path);
     cli.src_dir = Some(temp_dir.path().to_path_buf());
     cli.rootfs_stages = vec![]; // Empty stages should fail
 
@@ -161,18 +157,15 @@ fn test_build_with_empty_stages_fails() {
 
 #[test]
 fn test_build_builder_with_empty_stages_fails() {
-    // Use configuration environment guard to prevent race conditions with other tests
-    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
-
     // Create temporary empty config file to override system config
     let temp_config_dir = tempfile::TempDir::new().unwrap();
     let temp_config_path = temp_config_dir.path().join("trellis.toml");
     std::fs::write(&temp_config_path, "# Empty test config").unwrap();
-    _config_guard.set_config_path(&temp_config_path.to_string_lossy());
 
     let temp_dir = TempDir::new().unwrap();
 
     let mut cli = create_test_cli_with_command(Commands::BuildBuilder);
+    cli.config_path = Some(temp_config_path);
     cli.src_dir = Some(temp_dir.path().to_path_buf());
     cli.builder_stages = vec![]; // Empty stages should fail
 
@@ -204,19 +197,16 @@ fn test_build_with_command_failure() {
 
 #[test]
 fn test_build_with_missing_containerfiles() {
-    // Use configuration environment guard to prevent race conditions with other tests
-    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
-
     // Create temporary empty config file to override system config
     let temp_config_dir = tempfile::TempDir::new().unwrap();
     let temp_config_path = temp_config_dir.path().join("trellis.toml");
     std::fs::write(&temp_config_path, "# Empty test config").unwrap();
-    _config_guard.set_config_path(&temp_config_path.to_string_lossy());
 
     let temp_dir = TempDir::new().unwrap();
     // Don't create any containerfiles
 
     let mut cli = create_test_cli_with_command(Commands::Build);
+    cli.config_path = Some(temp_config_path);
     cli.src_dir = Some(temp_dir.path().to_path_buf());
 
     let executor = Arc::new(MockScenarios::all_success());
@@ -281,14 +271,10 @@ fn test_auto_clean_integration() {
 
 #[test]
 fn test_cache_configuration_applied() {
-    // Use configuration environment guard to prevent race conditions with other tests
-    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
-
     // Create temporary empty config file to override system config
     let temp_config_dir = tempfile::TempDir::new().unwrap();
     let temp_config_path = temp_config_dir.path().join("trellis.toml");
     std::fs::write(&temp_config_path, "# Empty test config").unwrap();
-    _config_guard.set_config_path(&temp_config_path.to_string_lossy());
 
     let temp_dir = TempDir::new().unwrap();
     common::setup_test_containerfiles(&temp_dir, &["base"]);
@@ -297,6 +283,7 @@ fn test_cache_configuration_applied() {
     let aur_cache = temp_dir.path().join("aur");
 
     let mut cli = create_test_cli_with_command(Commands::Build);
+    cli.config_path = Some(temp_config_path);
     cli.src_dir = Some(temp_dir.path().to_path_buf());
     cli.pacman_cache = Some(pacman_cache.clone());
     cli.aur_cache = Some(aur_cache.clone());
@@ -343,19 +330,16 @@ fn test_custom_rootfs_base() {
 
 #[test]
 fn test_build_command_with_quiet_flag() {
-    // Use configuration environment guard to prevent race conditions with other tests
-    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
-
     // Create temporary empty config file to override system config
     let temp_config_dir = tempfile::TempDir::new().unwrap();
     let temp_config_path = temp_config_dir.path().join("trellis.toml");
     std::fs::write(&temp_config_path, "# Empty test config").unwrap();
-    _config_guard.set_config_path(&temp_config_path.to_string_lossy());
 
     let temp_dir = TempDir::new().unwrap();
     common::setup_test_containerfiles(&temp_dir, &["base"]);
 
     let mut cli = create_test_cli_with_command(Commands::Build);
+    cli.config_path = Some(temp_config_path);
     cli.src_dir = Some(temp_dir.path().to_path_buf());
     cli.quiet = true; // Test CLI quiet flag
 
@@ -388,19 +372,16 @@ fn test_build_command_with_quiet_flag() {
 
 #[test]
 fn test_build_builder_command_with_quiet_flag() {
-    // Use configuration environment guard to prevent race conditions with other tests
-    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
-
     // Create temporary empty config file to override system config
     let temp_config_dir = tempfile::TempDir::new().unwrap();
     let temp_config_path = temp_config_dir.path().join("trellis.toml");
     std::fs::write(&temp_config_path, "# Empty test config").unwrap();
-    _config_guard.set_config_path(&temp_config_path.to_string_lossy());
 
     let temp_dir = TempDir::new().unwrap();
     common::setup_test_containerfiles(&temp_dir, &["base"]);
 
     let mut cli = create_test_cli_with_command(Commands::BuildBuilder);
+    cli.config_path = Some(temp_config_path);
     cli.src_dir = Some(temp_dir.path().to_path_buf());
     cli.quiet = true;
 
@@ -433,20 +414,17 @@ fn test_build_builder_command_with_quiet_flag() {
 
 #[test]
 fn test_run_command_with_quiet_flag() {
-    // Use configuration environment guard to prevent race conditions with other tests
-    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
-
     // Create temporary empty config file to override system config
     let temp_config_dir = tempfile::TempDir::new().unwrap();
     let temp_config_path = temp_config_dir.path().join("trellis.toml");
     std::fs::write(&temp_config_path, "# Empty test config").unwrap();
-    _config_guard.set_config_path(&temp_config_path.to_string_lossy());
 
     let temp_dir = TempDir::new().unwrap();
 
     let mut cli = create_test_cli_with_command(Commands::Run {
         args: vec!["echo".to_string(), "hello".to_string()],
     });
+    cli.config_path = Some(temp_config_path);
     cli.src_dir = Some(temp_dir.path().to_path_buf());
     cli.quiet = true;
 
@@ -468,19 +446,16 @@ fn test_run_command_with_quiet_flag() {
 
 #[test]
 fn test_update_command_with_quiet_flag() {
-    // Use configuration environment guard to prevent race conditions with other tests
-    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
-
     // Create temporary empty config file to override system config
     let temp_config_dir = tempfile::TempDir::new().unwrap();
     let temp_config_path = temp_config_dir.path().join("trellis.toml");
     std::fs::write(&temp_config_path, "# Empty test config").unwrap();
-    _config_guard.set_config_path(&temp_config_path.to_string_lossy());
 
     let temp_dir = TempDir::new().unwrap();
     common::setup_test_containerfiles(&temp_dir, &["base"]);
 
     let mut cli = create_test_cli_with_command(Commands::Update);
+    cli.config_path = Some(temp_config_path);
     cli.src_dir = Some(temp_dir.path().to_path_buf());
     cli.quiet = true;
 

@@ -31,6 +31,8 @@ fn create_test_cli() -> Cli {
         rootfs_tag: "test-rootfs".to_string(),
         builder_stages: vec![],
         quiet: false,
+        config_path: None,
+        skip_root_check: false,
     }
 }
 
@@ -318,6 +320,8 @@ fn test_trellis_app_creation() {
         rootfs_tag: "test-rootfs".to_string(),
         builder_stages: vec![],
         quiet: false,
+        config_path: None,
+        skip_root_check: false,
     };
 
     let app = TrellisApp::new(cli);
@@ -344,6 +348,8 @@ fn test_auto_clean_config() {
         rootfs_tag: "test-rootfs".to_string(),
         builder_stages: vec![],
         quiet: false,
+        config_path: None,
+        skip_root_check: false,
     };
 
     let config = TrellisConfig::new(cli).unwrap();

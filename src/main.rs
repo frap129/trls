@@ -12,7 +12,6 @@ mod trellis;
 use cli::Cli;
 use trellis::{
     common::{TrellisMessager, TrellisMessaging},
-    constants::env_vars,
     TrellisApp,
 };
 
@@ -26,9 +25,9 @@ use trellis::{
 /// # Errors
 ///
 /// Returns an error only if all detection methods fail.
-fn is_running_as_root() -> Result<bool> {
-    // Skip root check in test mode
-    if std::env::var(env_vars::SKIP_ROOT_CHECK).is_ok() {
+fn is_running_as_root(skip_check: bool) -> Result<bool> {
+    // Skip root check if requested
+    if skip_check {
         return Ok(true);
     }
 
@@ -81,7 +80,7 @@ fn main() -> Result<()> {
     let messager = TrellisMessager::new();
 
     // Check if running as root and prompt user if not
-    match is_running_as_root() {
+    match is_running_as_root(cli.skip_root_check) {
         Ok(true) => {} // Running as root, continue normally
         Ok(false) => {
             if !prompt_continue_as_non_root()? {

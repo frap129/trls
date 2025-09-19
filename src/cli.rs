@@ -62,6 +62,14 @@ pub struct Cli {
     /// Suppress output from wrapped commands (podman, bootc)
     #[arg(short, long)]
     pub quiet: bool,
+
+    /// Path to configuration file (overrides default /etc/trellis/trellis.toml)
+    #[arg(long)]
+    pub config_path: Option<PathBuf>,
+
+    /// Skip root user check (for testing purposes)
+    #[arg(long)]
+    pub skip_root_check: bool,
 }
 
 #[derive(Subcommand, Clone, Debug)]

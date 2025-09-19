@@ -28,6 +28,8 @@ fn create_minimal_cli() -> Cli {
         rootfs_tag: "test-rootfs".to_string(),
         builder_stages: vec![],
         quiet: false,
+        config_path: None,
+        skip_root_check: false,
     }
 }
 
@@ -62,8 +64,6 @@ fn test_missing_containerfile_error() {
 
 #[test]
 fn test_empty_stages_validation() {
-    // Use configuration environment guard to prevent race conditions with other tests
-    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
     let temp_dir = TempDir::new().unwrap();
 
     let mut cli = create_minimal_cli();
@@ -72,12 +72,9 @@ fn test_empty_stages_validation() {
     cli.src_dir = Some(temp_dir.path().to_path_buf()); // Use temp dir as src_dir
 
     // Temporarily remove the environment variable for this test
-    _config_guard.remove_config_env();
 
     // This should not fail during config creation since stages can be specified in file
     let _config = TrellisConfig::new(cli).unwrap();
-
-    // Environment will be restored automatically when _config_guard is dropped
 
     // The config may have default stages from system config, but CLI had empty stages
     // This test validates that empty CLI stages don't cause config creation to fail
@@ -86,21 +83,16 @@ fn test_empty_stages_validation() {
 
 #[test]
 fn test_invalid_config_file() {
-    // Use configuration environment guard to prevent race conditions with other tests
-    let _config_guard = common::isolation::ConfigEnvGuard::acquire();
     let temp_dir = TempDir::new().unwrap();
     let config_path = temp_dir.path().join("invalid.toml");
 
     // Write invalid TOML
     fs::write(&config_path, "invalid toml content [[[").unwrap();
 
-    // Set environment variable to use our invalid config
-    _config_guard.set_config_path(&config_path.to_string_lossy());
-
-    let cli = create_minimal_cli();
+    // Use CLI config path to load the invalid config
+    let mut cli = create_minimal_cli();
+    cli.config_path = Some(config_path);
     let result = TrellisConfig::new(cli);
-
-    // Environment will be restored automatically when _config_guard is dropped
 
     assert!(result.is_err());
     let error_msg = result.unwrap_err().to_string();

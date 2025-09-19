@@ -1,9 +1,8 @@
 use anyhow::{anyhow, Context, Result};
-use std::{env, fs, sync::Arc};
+use std::{fs, sync::Arc};
 
 use super::{
-    common::TrellisMessaging, constants::env_vars, discovery::ContainerfileDiscovery,
-    executor::CommandExecutor,
+    common::TrellisMessaging, discovery::ContainerfileDiscovery, executor::CommandExecutor,
 };
 use crate::config::TrellisConfig;
 
@@ -12,32 +11,6 @@ use crate::config::TrellisConfig;
 pub enum BuildType {
     Builder,
     Rootfs,
-}
-
-/// Manages environment variables with automatic cleanup.
-pub struct ScopedEnvVar {
-    key: String,
-    original_value: Option<String>,
-}
-
-impl ScopedEnvVar {
-    pub fn new(key: &str, value: &str) -> Self {
-        let original_value = env::var(key).ok();
-        env::set_var(key, value);
-        Self {
-            key: key.to_string(),
-            original_value,
-        }
-    }
-}
-
-impl Drop for ScopedEnvVar {
-    fn drop(&mut self) {
-        match &self.original_value {
-            Some(value) => env::set_var(&self.key, value),
-            None => env::remove_var(&self.key),
-        }
-    }
 }
 
 /// Builder for constructing podman commands with type safety.
@@ -90,6 +63,13 @@ impl PodmanCommandBuilder {
 
     pub fn squash(mut self) -> Self {
         self.args.push("--squash".to_string());
+        self
+    }
+
+    pub fn layers(mut self, enabled: bool) -> Self {
+        if !enabled {
+            self.args.push("--layers=false".to_string());
+        }
         self
     }
 
@@ -183,11 +163,6 @@ impl<'a> ContainerBuilder<'a> {
         self.discovery.validate_stages(build_stages)?;
 
         let mut last_stage = String::new();
-        let _scoped_env = if !self.config.podman_build_cache {
-            Some(ScopedEnvVar::new(env_vars::BUILDAH_LAYERS, "false"))
-        } else {
-            None
-        };
 
         for (i, build_stage) in build_stages.iter().enumerate() {
             let (group, stage) = ContainerfileDiscovery::parse_stage_name(build_stage);
@@ -225,7 +200,8 @@ impl<'a> ContainerBuilder<'a> {
                 .build_arg("BASE_IMAGE", &base_image)
                 .target(&stage)
                 .tag(&tag)
-                .no_cache(!self.config.podman_build_cache);
+                .no_cache(!self.config.podman_build_cache)
+                .layers(self.config.podman_build_cache);
 
             // Add rootfs-specific configuration
             if matches!(build_type, BuildType::Rootfs) {

@@ -1,11 +1,11 @@
-use std::{env, fs, path::PathBuf};
+use std::{fs, path::PathBuf};
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     cli::Cli,
-    trellis::constants::{containers, env_vars, paths},
+    trellis::constants::{containers, paths},
 };
 
 use super::merger::{BoolMerger, ConfigMerger};
@@ -85,15 +85,15 @@ impl TrellisConfig {
     ///
     /// CLI arguments take precedence over configuration file values, which take precedence
     /// over default values. The configuration file path can be overridden with the
-    /// `TRELLIS_CONFIG` environment variable.
+    /// `--config-path` CLI argument.
     ///
     /// # Errors
     ///
     /// Returns an error if the configuration file exists but cannot be read or parsed.
     pub fn new(cli: Cli) -> Result<Self> {
-        let config_file = env::var(env_vars::CONFIG_PATH)
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from(paths::DEFAULT_CONFIG_PATH));
+        let config_file = cli
+            .config_path
+            .unwrap_or_else(|| PathBuf::from(paths::DEFAULT_CONFIG_PATH));
 
         let file_config = if config_file.exists() {
             let content = fs::read_to_string(&config_file)

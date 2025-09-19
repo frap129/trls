@@ -5,7 +5,7 @@ use tempfile::TempDir;
 #[test]
 fn test_cli_help() {
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
+    cmd.arg("--skip-root-check");
     cmd.arg("--help");
     cmd.assert().success().stdout(predicate::str::contains(
         "A container build system for multi-stage builds",
@@ -17,7 +17,7 @@ fn test_cli_version() {
     // The CLI doesn't support --version, so test -V instead, but clap doesn't add this by default
     // Let's just test help which should show the version in the usage
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
+    cmd.arg("--skip-root-check");
     cmd.arg("--help");
     cmd.assert()
         .success()
@@ -28,7 +28,7 @@ fn test_cli_version() {
 fn test_build_builder_no_stages() {
     let temp_dir = TempDir::new().unwrap();
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
+    cmd.arg("--skip-root-check");
     // Don't override builder-stages, so it should use empty default when no config
     cmd.arg("--src-dir")
         .arg(temp_dir.path())
@@ -47,7 +47,7 @@ fn test_build_builder_no_stages() {
 fn test_build_no_stages() {
     let temp_dir = TempDir::new().unwrap();
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
+    cmd.arg("--skip-root-check");
     // Don't override rootfs-stages, so it should use empty default when no config
     cmd.arg("--src-dir").arg(temp_dir.path()).arg("build");
 
@@ -63,7 +63,7 @@ fn test_build_builder_with_missing_containerfile() {
     let temp_dir = TempDir::new().unwrap();
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
+    cmd.arg("--skip-root-check");
     cmd.arg("--src-dir")
         .arg(temp_dir.path())
         .arg("--builder-stages")
@@ -80,7 +80,7 @@ fn test_build_with_missing_containerfile() {
     let temp_dir = TempDir::new().unwrap();
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
+    cmd.arg("--skip-root-check");
     cmd.arg("--src-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-stages")
@@ -96,7 +96,7 @@ fn test_build_with_missing_containerfile() {
 fn test_clean_command() {
     // Test that clean command runs and provides appropriate output
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
+    cmd.arg("--skip-root-check");
     cmd.arg("clean");
 
     let output = cmd.output().unwrap();
@@ -118,7 +118,7 @@ fn test_clean_command() {
 fn test_clean_command_with_custom_tags() {
     // Test that clean command works with custom tags
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
+    cmd.arg("--skip-root-check");
     cmd.arg("--builder-tag")
         .arg("custom-builder")
         .arg("--rootfs-tag")
@@ -144,7 +144,7 @@ fn test_config_override_builder_tag() {
     let temp_dir = TempDir::new().unwrap();
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
+    cmd.arg("--skip-root-check");
     cmd.arg("--builder-tag")
         .arg("custom-builder")
         .arg("--src-dir")
@@ -163,7 +163,7 @@ fn test_config_override_rootfs_tag() {
     let temp_dir = TempDir::new().unwrap();
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
+    cmd.arg("--skip-root-check");
     cmd.arg("--rootfs-tag")
         .arg("custom-rootfs")
         .arg("--src-dir")
@@ -180,7 +180,7 @@ fn test_config_override_rootfs_tag() {
 #[test]
 fn test_run_command_with_args() {
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
+    cmd.arg("--skip-root-check");
     cmd.arg("run").arg("--").arg("echo").arg("hello");
 
     // This might succeed if the system has the container, so we just check it runs
@@ -193,7 +193,7 @@ fn test_run_command_with_args() {
 fn test_update_command() {
     let temp_dir = TempDir::new().unwrap();
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
+    cmd.arg("--skip-root-check");
     cmd.arg("--src-dir").arg(temp_dir.path()).arg("update");
 
     // This will likely fail since we don't have stages defined, but it tests the command
@@ -208,7 +208,7 @@ fn test_multiple_stages() {
     let temp_dir = TempDir::new().unwrap();
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
+    cmd.arg("--skip-root-check");
     cmd.arg("--src-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-stages")
@@ -225,7 +225,7 @@ fn test_extra_contexts() {
     let temp_dir = TempDir::new().unwrap();
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
+    cmd.arg("--skip-root-check");
     cmd.arg("--src-dir")
         .arg(temp_dir.path())
         .arg("--extra-contexts")
@@ -244,7 +244,7 @@ fn test_extra_mounts() {
     let temp_dir = TempDir::new().unwrap();
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.env("TRLS_SKIP_ROOT_CHECK", "1");
+    cmd.arg("--skip-root-check");
     cmd.arg("--src-dir")
         .arg(temp_dir.path())
         .arg("--extra-mounts")

@@ -76,7 +76,7 @@ fn test_build_with_flat_containerfiles() {
     setup_test_containerfiles(&temp_dir, &["base"]);
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.env("TRLS_SKIP_ROOT_CHECK", "1")
+    cmd.arg("--skip-root-check")
         .arg("--src-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-stages")
@@ -98,7 +98,7 @@ fn test_build_with_nested_containerfiles() {
     setup_nested_containerfiles(&temp_dir, &[("base", "base")]);
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.env("TRLS_SKIP_ROOT_CHECK", "1")
+    cmd.arg("--skip-root-check")
         .arg("--src-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-stages")
@@ -178,7 +178,7 @@ fn test_error_handling_with_invalid_stage() {
     setup_test_containerfiles(&temp_dir, &["base"]);
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.env("TRLS_SKIP_ROOT_CHECK", "1")
+    cmd.arg("--skip-root-check")
         .arg("--src-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-stages")
@@ -196,7 +196,7 @@ fn test_rootfs_base_cli_argument() {
     setup_test_containerfiles(&temp_dir, &["base"]);
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.env("TRLS_SKIP_ROOT_CHECK", "1")
+    cmd.arg("--skip-root-check")
         .arg("--src-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-stages")
@@ -245,8 +245,9 @@ aur_cache = "/tmp/aur-cache"
     fs::write(&config_path, config_content).unwrap();
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.env("TRLS_SKIP_ROOT_CHECK", "1")
-        .env("TRELLIS_CONFIG", &config_path)
+    cmd.arg("--skip-root-check")
+        .arg("--config-path")
+        .arg(&config_path)
         .arg("--src-dir")
         .arg(temp_dir.path())
         .arg("build");
@@ -279,8 +280,9 @@ aur_cache = "/tmp/aur-cache"
     fs::write(&config_path, config_content).unwrap();
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.env("TRLS_SKIP_ROOT_CHECK", "1")
-        .env("TRELLIS_CONFIG", &config_path)
+    cmd.arg("--skip-root-check")
+        .arg("--config-path")
+        .arg(&config_path)
         .arg("--src-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-base")

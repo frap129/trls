@@ -36,18 +36,6 @@ pub mod containers {
     pub const STAGE_PREFIX: &str = "trellis-stage";
 }
 
-/// Environment variable names
-pub mod env_vars {
-    /// Environment variable to skip root check (for testing)
-    pub const SKIP_ROOT_CHECK: &str = "TRLS_SKIP_ROOT_CHECK";
-
-    /// Environment variable to override config file path
-    pub const CONFIG_PATH: &str = "TRELLIS_CONFIG";
-
-    /// Buildah layers environment variable for cache control
-    pub const BUILDAH_LAYERS: &str = "BUILDAH_LAYERS";
-}
-
 /// File and path patterns
 pub mod patterns {
     /// Containerfile filename pattern
