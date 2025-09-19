@@ -20,7 +20,7 @@ fn create_minimal_cli() -> Cli {
         auto_clean: false,
         pacman_cache: None,
         aur_cache: None,
-        src_dir: None,
+        stages_dir: None,
         extra_contexts: vec![],
         extra_mounts: vec![],
         rootfs_stages: vec![],
@@ -43,7 +43,7 @@ fn test_missing_containerfile_error() {
         auto_clean: false,
         pacman_cache: None,
         aur_cache: None,
-        src_dir: temp_dir.path().to_path_buf(),
+        stages_dir: temp_dir.path().to_path_buf(),
         rootfs_stages: vec![],
         rootfs_base: "scratch".to_string(),
         extra_contexts: vec![],
@@ -69,7 +69,7 @@ fn test_empty_stages_validation() {
     let mut cli = create_minimal_cli();
     cli.builder_stages = vec![]; // Empty stages
     cli.rootfs_stages = vec![]; // Empty stages
-    cli.src_dir = Some(temp_dir.path().to_path_buf()); // Use temp dir as src_dir
+    cli.stages_dir = Some(temp_dir.path().to_path_buf()); // Use temp dir as stages_dir
 
     // Temporarily remove the environment variable for this test
 
@@ -115,7 +115,7 @@ fn test_nonexistent_cache_directory_parent() {
         auto_clean: false,
         pacman_cache: Some(nonexistent_cache),
         aur_cache: None,
-        src_dir: temp_dir.path().to_path_buf(),
+        stages_dir: temp_dir.path().to_path_buf(),
         rootfs_stages: vec!["base".to_string()],
         rootfs_base: "scratch".to_string(),
         extra_contexts: vec![],
@@ -159,7 +159,7 @@ fn test_containerfile_discovery_with_symlinks() {
         auto_clean: false,
         pacman_cache: None,
         aur_cache: None,
-        src_dir: temp_dir.path().to_path_buf(),
+        stages_dir: temp_dir.path().to_path_buf(),
         rootfs_stages: vec![],
         rootfs_base: "scratch".to_string(),
         extra_contexts: vec![],
@@ -191,7 +191,7 @@ fn test_stage_validation_with_missing_files() {
         auto_clean: false,
         pacman_cache: None,
         aur_cache: None,
-        src_dir: temp_dir.path().to_path_buf(),
+        stages_dir: temp_dir.path().to_path_buf(),
         rootfs_stages: vec![],
         rootfs_base: "scratch".to_string(),
         extra_contexts: vec![],
@@ -257,7 +257,7 @@ fn test_readonly_cache_directory() {
         auto_clean: false,
         pacman_cache: Some(cache_dir.clone()),
         aur_cache: None,
-        src_dir: temp_dir.path().to_path_buf(),
+        stages_dir: temp_dir.path().to_path_buf(),
         rootfs_stages: vec!["base".to_string()],
         rootfs_base: "scratch".to_string(),
         extra_contexts: vec![],
@@ -293,7 +293,7 @@ fn test_image_filtering_logic() {
         auto_clean: false,
         pacman_cache: None,
         aur_cache: None,
-        src_dir: std::path::PathBuf::from("/tmp"),
+        stages_dir: std::path::PathBuf::from("/tmp"),
         rootfs_stages: vec![],
         rootfs_base: "scratch".to_string(),
         extra_contexts: vec![],

@@ -34,7 +34,7 @@ pub struct BuildConfig {
 pub struct EnvironmentConfig {
     pub pacman_cache: Option<PathBuf>,
     pub aur_cache: Option<PathBuf>,
-    pub src_dir: Option<PathBuf>,
+    pub stages_dir: Option<PathBuf>,
     pub hooks_dir: Option<PathBuf>,
 }
 
@@ -55,7 +55,7 @@ impl Default for Config {
             environment: Some(EnvironmentConfig {
                 pacman_cache: Some(PathBuf::from(paths::DEFAULT_PACMAN_CACHE)),
                 aur_cache: Some(PathBuf::from(paths::DEFAULT_AUR_CACHE)),
-                src_dir: None,
+                stages_dir: None,
                 hooks_dir: Some(PathBuf::from(paths::DEFAULT_HOOKS_DIR)),
             }),
         }
@@ -70,7 +70,7 @@ pub struct TrellisConfig {
     pub auto_clean: bool,
     pub pacman_cache: Option<PathBuf>,
     pub aur_cache: Option<PathBuf>,
-    pub src_dir: PathBuf,
+    pub stages_dir: PathBuf,
     pub rootfs_stages: Vec<String>,
     pub rootfs_base: String,
     pub extra_contexts: Vec<String>,
@@ -159,10 +159,10 @@ impl TrellisConfig {
                 Some(Self::get_env_field(env_config, |e| &e.aur_cache)),
                 None,
             ),
-            src_dir: cli
-                .src_dir
-                .or_else(|| env_config.and_then(|e| e.src_dir.clone()))
-                .unwrap_or_else(|| PathBuf::from(paths::DEFAULT_SRC_DIR)),
+            stages_dir: cli
+                .stages_dir
+                .or_else(|| env_config.and_then(|e| e.stages_dir.clone()))
+                .unwrap_or_else(|| PathBuf::from(paths::DEFAULT_STAGES_DIR)),
             hooks_dir: Self::resolve_hooks_dir(env_config),
             quiet: cli.quiet,
         };

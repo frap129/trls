@@ -31,9 +31,9 @@ pub struct Cli {
     #[arg(long)]
     pub aur_cache: Option<PathBuf>,
 
-    /// Path to the directory with Containerfiles and setup files
+    /// Path to the directory with container stage definitions
     #[arg(long)]
-    pub src_dir: Option<PathBuf>,
+    pub stages_dir: Option<PathBuf>,
 
     /// A comma delimited list of container build contexts
     #[arg(long, value_delimiter = ',')]
@@ -76,7 +76,7 @@ pub struct Cli {
 pub enum Commands {
     /// (Re-)Build pacstrap container that's used by the other commands
     BuildBuilder,
-    /// Build all requested stages from files in --src-dir
+    /// Build all requested stages from files in --stages-dir
     Build,
     /// Remove unused container images
     Clean,

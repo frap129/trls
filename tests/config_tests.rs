@@ -77,7 +77,7 @@ fn test_build_with_flat_containerfiles() {
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
     cmd.arg("--skip-root-check")
-        .arg("--src-dir")
+        .arg("--stages-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-stages")
         .arg("base")
@@ -99,7 +99,7 @@ fn test_build_with_nested_containerfiles() {
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
     cmd.arg("--skip-root-check")
-        .arg("--src-dir")
+        .arg("--stages-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-stages")
         .arg("base")
@@ -134,7 +134,7 @@ RUN echo "Stage 2"
     .unwrap();
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.arg("--src-dir")
+    cmd.arg("--stages-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-stages")
         .arg("multi:stage1,multi:stage2")
@@ -156,7 +156,7 @@ fn test_cache_directory_creation() {
     let aur_cache = temp_dir.path().join("aur-cache");
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.arg("--src-dir")
+    cmd.arg("--stages-dir")
         .arg(temp_dir.path())
         .arg("--pacman-cache")
         .arg(&pacman_cache)
@@ -179,7 +179,7 @@ fn test_error_handling_with_invalid_stage() {
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
     cmd.arg("--skip-root-check")
-        .arg("--src-dir")
+        .arg("--stages-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-stages")
         .arg("nonexistent")
@@ -197,7 +197,7 @@ fn test_rootfs_base_cli_argument() {
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
     cmd.arg("--skip-root-check")
-        .arg("--src-dir")
+        .arg("--stages-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-stages")
         .arg("base")
@@ -248,7 +248,7 @@ aur_cache = "/tmp/aur-cache"
     cmd.arg("--skip-root-check")
         .arg("--config-path")
         .arg(&config_path)
-        .arg("--src-dir")
+        .arg("--stages-dir")
         .arg(temp_dir.path())
         .arg("build");
 
@@ -283,7 +283,7 @@ aur_cache = "/tmp/aur-cache"
     cmd.arg("--skip-root-check")
         .arg("--config-path")
         .arg(&config_path)
-        .arg("--src-dir")
+        .arg("--stages-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-base")
         .arg("alpine:edge") // CLI should override config file

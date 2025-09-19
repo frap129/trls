@@ -91,8 +91,8 @@ trls --builder-tag my-builder build-builder
 # Override rootfs stages
 trls --rootfs-stages base,custom,final build
 
-# Override source directory
-trls --src-dir /path/to/my/containerfiles build
+# Override stages directory
+trls --stages-dir /path/to/my/containerfiles build
 
 # Enable build cache
 trls --podman-build-cache true build

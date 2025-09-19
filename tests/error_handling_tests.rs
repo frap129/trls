@@ -28,7 +28,7 @@ fn create_error_test_config(temp_dir: &TempDir) -> TrellisConfig {
         auto_clean: false,
         pacman_cache: None,
         aur_cache: None,
-        src_dir: temp_dir.path().to_path_buf(),
+        stages_dir: temp_dir.path().to_path_buf(),
         rootfs_stages: vec!["base".to_string()],
         rootfs_base: "scratch".to_string(),
         extra_contexts: vec![],
@@ -144,7 +144,7 @@ fn test_app_with_corrupted_config() {
         auto_clean: false,
         pacman_cache: None,
         aur_cache: None,
-        src_dir: Some(temp_dir.path().to_path_buf()),
+        stages_dir: Some(temp_dir.path().to_path_buf()),
         extra_contexts: vec![],
         extra_mounts: vec![],
         rootfs_stages: vec!["base".to_string()],
@@ -319,7 +319,7 @@ fn test_runner_with_extremely_long_arguments() {
 }
 
 #[test]
-fn test_app_with_invalid_src_directory() {
+fn test_app_with_invalid_stages_directory() {
     let temp_dir = TempDir::new().unwrap();
     let invalid_path = temp_dir.path().join("does_not_exist").join("nested");
 
@@ -337,7 +337,7 @@ fn test_app_with_invalid_src_directory() {
         auto_clean: false,
         pacman_cache: None,
         aur_cache: None,
-        src_dir: Some(invalid_path.clone()),
+        stages_dir: Some(invalid_path.clone()),
         extra_contexts: vec![],
         extra_mounts: vec![],
         rootfs_stages: vec!["base".to_string()],
@@ -358,7 +358,7 @@ fn test_app_with_invalid_src_directory() {
     let error_message = result.unwrap_err().to_string();
     // Test passes if we get either the expected directory error or a config parsing error
     // (which can happen due to test isolation issues with environment variables)
-    let is_expected_error = error_message.contains("Source directory does not exist")
+    let is_expected_error = error_message.contains("Stages directory does not exist")
         || error_message.contains("Failed to parse config file");
 
     assert!(

@@ -20,7 +20,7 @@ fn create_test_cli_with_command(command: Commands) -> Cli {
         auto_clean: false,
         pacman_cache: None,
         aur_cache: None,
-        src_dir: None,
+        stages_dir: None,
         extra_contexts: vec![],
         extra_mounts: vec![],
         rootfs_stages: vec!["base".to_string()],
@@ -35,14 +35,18 @@ fn create_test_cli_with_command(command: Commands) -> Cli {
 
 #[test]
 fn test_trellis_app_creation_success() {
-    let cli = create_test_cli_with_command(Commands::Build);
+    let temp_dir = TempDir::new().unwrap();
+    let mut cli = create_test_cli_with_command(Commands::Build);
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
     let app = TrellisApp::new(cli);
     assert!(app.is_ok());
 }
 
 #[test]
 fn test_trellis_app_with_custom_executor() {
-    let cli = create_test_cli_with_command(Commands::Build);
+    let temp_dir = TempDir::new().unwrap();
+    let mut cli = create_test_cli_with_command(Commands::Build);
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
     let executor = Arc::new(MockScenarios::all_success());
     let app = TrellisApp::with_executor(cli, executor);
     assert!(app.is_ok());
@@ -54,7 +58,7 @@ fn test_build_command_execution() {
     common::setup_test_containerfiles(&temp_dir, &["base"]);
 
     let mut cli = create_test_cli_with_command(Commands::Build);
-    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
 
     let executor = Arc::new(MockScenarios::all_success());
     let app = TrellisApp::with_executor(cli, executor).unwrap();
@@ -69,7 +73,7 @@ fn test_build_builder_command_execution() {
     common::setup_test_containerfiles(&temp_dir, &["base"]);
 
     let mut cli = create_test_cli_with_command(Commands::BuildBuilder);
-    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
 
     let executor = Arc::new(MockScenarios::all_success());
     let app = TrellisApp::with_executor(cli, executor).unwrap();
@@ -85,7 +89,7 @@ fn test_run_command_execution() {
     let mut cli = create_test_cli_with_command(Commands::Run {
         args: vec!["echo".to_string(), "hello".to_string()],
     });
-    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
 
     let executor = Arc::new(MockScenarios::all_success());
     let user_interaction = Arc::new(MockUserInteractionScenarios::never_called());
@@ -106,7 +110,7 @@ fn test_clean_command_execution() {
 
     let mut cli = create_test_cli_with_command(Commands::Clean);
     cli.config_path = Some(temp_config_path);
-    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
 
     let executor = Arc::new(MockScenarios::multiple_images());
     let app = TrellisApp::with_executor(cli, executor).unwrap();
@@ -121,7 +125,7 @@ fn test_update_command_execution() {
     common::setup_test_containerfiles(&temp_dir, &["base"]);
 
     let mut cli = create_test_cli_with_command(Commands::Update);
-    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
 
     let executor = Arc::new(MockScenarios::all_success());
     let app = TrellisApp::with_executor(cli, executor).unwrap();
@@ -141,7 +145,7 @@ fn test_build_with_empty_stages_fails() {
 
     let mut cli = create_test_cli_with_command(Commands::Build);
     cli.config_path = Some(temp_config_path);
-    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
     cli.rootfs_stages = vec![]; // Empty stages should fail
 
     let executor = Arc::new(MockScenarios::all_success());
@@ -166,7 +170,7 @@ fn test_build_builder_with_empty_stages_fails() {
 
     let mut cli = create_test_cli_with_command(Commands::BuildBuilder);
     cli.config_path = Some(temp_config_path);
-    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
     cli.builder_stages = vec![]; // Empty stages should fail
 
     let executor = Arc::new(MockScenarios::all_success());
@@ -186,7 +190,7 @@ fn test_build_with_command_failure() {
     common::setup_test_containerfiles(&temp_dir, &["base"]);
 
     let mut cli = create_test_cli_with_command(Commands::Build);
-    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
 
     let executor = Arc::new(MockScenarios::build_failures());
     let app = TrellisApp::with_executor(cli, executor).unwrap();
@@ -207,7 +211,7 @@ fn test_build_with_missing_containerfiles() {
 
     let mut cli = create_test_cli_with_command(Commands::Build);
     cli.config_path = Some(temp_config_path);
-    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
 
     let executor = Arc::new(MockScenarios::all_success());
     let app = TrellisApp::with_executor(cli, executor).unwrap();
@@ -223,7 +227,7 @@ fn test_configuration_validation_integration() {
     let temp_dir = TempDir::new().unwrap();
 
     let mut cli = create_test_cli_with_command(Commands::Build);
-    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
     cli.builder_tag = "test-rootfs".to_string(); // Same as rootfs_tag - should fail validation
     cli.rootfs_tag = "test-rootfs".to_string();
 
@@ -243,7 +247,7 @@ fn test_multi_stage_build_success() {
     common::setup_test_containerfiles(&temp_dir, &["base", "tools", "final"]);
 
     let mut cli = create_test_cli_with_command(Commands::Build);
-    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
     cli.rootfs_stages = vec!["base".to_string(), "tools".to_string(), "final".to_string()];
 
     let executor = Arc::new(MockScenarios::all_success());
@@ -259,7 +263,7 @@ fn test_auto_clean_integration() {
     common::setup_test_containerfiles(&temp_dir, &["base"]);
 
     let mut cli = create_test_cli_with_command(Commands::Build);
-    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
     cli.auto_clean = true;
 
     let executor = Arc::new(MockScenarios::multiple_images());
@@ -284,7 +288,7 @@ fn test_cache_configuration_applied() {
 
     let mut cli = create_test_cli_with_command(Commands::Build);
     cli.config_path = Some(temp_config_path);
-    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
     cli.pacman_cache = Some(pacman_cache.clone());
     cli.aur_cache = Some(aur_cache.clone());
 
@@ -301,7 +305,7 @@ fn test_extra_contexts_and_mounts() {
     common::setup_test_containerfiles(&temp_dir, &["base"]);
 
     let mut cli = create_test_cli_with_command(Commands::Build);
-    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
     cli.extra_contexts = vec!["context1=/tmp".to_string()];
     cli.extra_mounts = vec!["mount1=/opt".to_string().into()];
 
@@ -318,7 +322,7 @@ fn test_custom_rootfs_base() {
     common::setup_test_containerfiles(&temp_dir, &["base"]);
 
     let mut cli = create_test_cli_with_command(Commands::Build);
-    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
     cli.rootfs_base = "fedora:39".to_string();
 
     let executor = Arc::new(MockScenarios::all_success());
@@ -340,7 +344,7 @@ fn test_build_command_with_quiet_flag() {
 
     let mut cli = create_test_cli_with_command(Commands::Build);
     cli.config_path = Some(temp_config_path);
-    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
     cli.quiet = true; // Test CLI quiet flag
 
     let mut mock_executor = MockCommandExecutor::new();
@@ -382,7 +386,7 @@ fn test_build_builder_command_with_quiet_flag() {
 
     let mut cli = create_test_cli_with_command(Commands::BuildBuilder);
     cli.config_path = Some(temp_config_path);
-    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
     cli.quiet = true;
 
     let mut mock_executor = MockCommandExecutor::new();
@@ -425,7 +429,7 @@ fn test_run_command_with_quiet_flag() {
         args: vec!["echo".to_string(), "hello".to_string()],
     });
     cli.config_path = Some(temp_config_path);
-    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
     cli.quiet = true;
 
     let mut mock_executor = MockCommandExecutor::new();
@@ -456,7 +460,7 @@ fn test_update_command_with_quiet_flag() {
 
     let mut cli = create_test_cli_with_command(Commands::Update);
     cli.config_path = Some(temp_config_path);
-    cli.src_dir = Some(temp_dir.path().to_path_buf());
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
     cli.quiet = true;
 
     let mut mock_executor = MockCommandExecutor::new();

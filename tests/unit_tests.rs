@@ -23,7 +23,7 @@ fn create_test_cli() -> Cli {
         auto_clean: false,
         pacman_cache: None,
         aur_cache: None,
-        src_dir: None,
+        stages_dir: None,
         extra_contexts: vec![],
         extra_mounts: vec![],
         rootfs_stages: vec![],
@@ -44,7 +44,7 @@ fn create_test_config(temp_dir: &TempDir) -> TrellisConfig {
         auto_clean: false,
         pacman_cache: None,
         aur_cache: None,
-        src_dir: temp_dir.path().to_path_buf(),
+        stages_dir: temp_dir.path().to_path_buf(),
         rootfs_stages: vec!["base".to_string(), "final".to_string()],
         rootfs_base: "scratch".to_string(),
         extra_contexts: vec![],
@@ -71,7 +71,9 @@ fn test_config_default() {
 
 #[test]
 fn test_rootfs_base_default_value() {
-    let cli = create_test_cli();
+    let temp_dir = TempDir::new().unwrap();
+    let mut cli = create_test_cli();
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
     let config = TrellisConfig::new(cli).unwrap();
 
     // Default value should be "scratch"
@@ -80,8 +82,10 @@ fn test_rootfs_base_default_value() {
 
 #[test]
 fn test_rootfs_base_cli_override() {
+    let temp_dir = TempDir::new().unwrap();
     let mut cli = create_test_cli();
     cli.rootfs_base = "alpine:latest".to_string();
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
 
     let config = TrellisConfig::new(cli).unwrap();
 
@@ -91,7 +95,9 @@ fn test_rootfs_base_cli_override() {
 
 #[test]
 fn test_trellis_config_with_defaults() {
-    let cli = create_test_cli();
+    let temp_dir = TempDir::new().unwrap();
+    let mut cli = create_test_cli();
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
     let config = TrellisConfig::new(cli).unwrap();
 
     // CLI values should override defaults when they differ from defaults
@@ -106,10 +112,12 @@ fn test_trellis_config_with_defaults() {
 
 #[test]
 fn test_trellis_config_with_cli_overrides() {
+    let temp_dir = TempDir::new().unwrap();
     let mut cli = create_test_cli();
     cli.builder_stages = vec!["stage1".to_string(), "stage2".to_string()];
     cli.rootfs_stages = vec!["base".to_string(), "final".to_string()];
     cli.podman_build_cache = Some(true);
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
 
     let config = TrellisConfig::new(cli).unwrap();
 
@@ -133,7 +141,7 @@ rootfs_tag = "file-rootfs"
 podman_build_cache = true
 
 [environment]
-src_dir = "/custom/src"
+stages_dir = "/custom/src"
 pacman_cache = "/custom/pacman"
 aur_cache = "/custom/aur"
 hooks_dir = "/custom/hooks"
@@ -191,8 +199,10 @@ rootfs_base = "ubuntu:20.04"
     );
 
     // CLI should override this value
+    let temp_dir2 = TempDir::new().unwrap();
     let mut cli = create_test_cli();
     cli.rootfs_base = "alpine:edge".to_string();
+    cli.stages_dir = Some(temp_dir2.path().to_path_buf());
 
     let trellis_config = TrellisConfig::new(cli).unwrap();
 
@@ -214,7 +224,9 @@ builder_tag = "test"
     assert_eq!(build.rootfs_base, None);
 
     // When no config file value and CLI uses default, should get "scratch"
-    let cli = create_test_cli();
+    let temp_dir = TempDir::new().unwrap();
+    let mut cli = create_test_cli();
+    cli.stages_dir = Some(temp_dir.path().to_path_buf());
     let trellis_config = TrellisConfig::new(cli).unwrap();
     assert_eq!(trellis_config.rootfs_base, "scratch");
 }
@@ -305,6 +317,7 @@ fn test_find_containerfile_recursive_search() {
 
 #[test]
 fn test_trellis_app_creation() {
+    let temp_dir = TempDir::new().unwrap();
     let cli = Cli {
         command: Commands::Build,
         builder_tag: "test-builder".to_string(),
@@ -312,7 +325,7 @@ fn test_trellis_app_creation() {
         auto_clean: false,
         pacman_cache: None,
         aur_cache: None,
-        src_dir: None,
+        stages_dir: Some(temp_dir.path().to_path_buf()),
         extra_contexts: vec![],
         extra_mounts: vec![],
         rootfs_stages: vec!["base".to_string()],
@@ -340,7 +353,7 @@ fn test_auto_clean_config() {
         auto_clean: true,
         pacman_cache: None,
         aur_cache: None,
-        src_dir: Some(temp_dir.path().to_path_buf()),
+        stages_dir: Some(temp_dir.path().to_path_buf()),
         extra_contexts: vec![],
         extra_mounts: vec![],
         rootfs_stages: vec!["base".to_string()],
@@ -402,7 +415,7 @@ fn test_rootfs_base_functionality_first_stage() {
         auto_clean: false,
         pacman_cache: None,
         aur_cache: None,
-        src_dir: temp_dir.path().to_path_buf(),
+        stages_dir: temp_dir.path().to_path_buf(),
         rootfs_stages: vec!["base".to_string()],
         rootfs_base: "ubuntu:22.04".to_string(),
         extra_contexts: vec![],
@@ -434,7 +447,7 @@ fn test_rootfs_base_functionality_subsequent_stages() {
         auto_clean: false,
         pacman_cache: None,
         aur_cache: None,
-        src_dir: temp_dir.path().to_path_buf(),
+        stages_dir: temp_dir.path().to_path_buf(),
         rootfs_stages: vec!["base".to_string(), "tools".to_string()],
         rootfs_base: "alpine:latest".to_string(),
         extra_contexts: vec![],
@@ -465,7 +478,7 @@ fn test_rootfs_base_with_default_scratch() {
         auto_clean: false,
         pacman_cache: None,
         aur_cache: None,
-        src_dir: temp_dir.path().to_path_buf(),
+        stages_dir: temp_dir.path().to_path_buf(),
         rootfs_stages: vec!["base".to_string()],
         rootfs_base: "scratch".to_string(), // Default value
         extra_contexts: vec![],
@@ -503,7 +516,7 @@ fn test_rootfs_base_with_custom_images() {
             auto_clean: false,
             pacman_cache: None,
             aur_cache: None,
-            src_dir: temp_dir.path().to_path_buf(),
+            stages_dir: temp_dir.path().to_path_buf(),
             rootfs_stages: vec!["base".to_string()],
             rootfs_base: base_image_value.to_string(),
             extra_contexts: vec![],

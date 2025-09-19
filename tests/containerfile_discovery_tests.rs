@@ -16,7 +16,7 @@ fn create_discovery_config(temp_dir: &TempDir) -> TrellisConfig {
         auto_clean: false,
         pacman_cache: None,
         aur_cache: None,
-        src_dir: temp_dir.path().to_path_buf(),
+        stages_dir: temp_dir.path().to_path_buf(),
         rootfs_stages: vec!["base".to_string()],
         rootfs_base: "scratch".to_string(),
         extra_contexts: vec![],

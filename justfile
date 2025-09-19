@@ -61,19 +61,19 @@ release-test: test release
 # Install binary to system (requires sudo)
 install: release-test
     sudo install -Dm755 target/release/trls /usr/local/bin/trls
-    sudo mkdir -p /var/lib/trellis/src
+    sudo mkdir -p /var/lib/trellis/stages
     sudo mkdir -p /var/cache/trellis/aur
     @echo "✅ Trellis installed to /usr/local/bin/trls"
-    @echo "✅ Default directories created: /var/lib/trellis/src, /var/cache/trellis/aur"
+    @echo "✅ Default directories created: /var/lib/trellis/stages, /var/cache/trellis/aur"
     @echo "ℹ️  Run 'just install-hooks' to install system hooks"
 
 # Install binary to custom directory
 install-to PREFIX: release-test
     sudo install -Dm755 target/release/trls {{PREFIX}}/bin/trls
-    sudo mkdir -p /var/lib/trellis/src
+    sudo mkdir -p /var/lib/trellis/stages
     sudo mkdir -p /var/cache/trellis/aur
     @echo "✅ Trellis installed to {{PREFIX}}/bin/trls"
-    @echo "✅ Default directories created: /var/lib/trellis/src, /var/cache/trellis/aur"
+    @echo "✅ Default directories created: /var/lib/trellis/stages, /var/cache/trellis/aur"
     @echo "ℹ️  Run 'just install-hooks' to install system hooks"
 
 # Install system hooks (requires sudo)
@@ -86,7 +86,7 @@ install-hooks:
 uninstall:
     sudo rm -f /usr/local/bin/trls
     @echo "✅ Trellis uninstalled from /usr/local/bin/trls"
-    @echo "ℹ️  Cache and src directories preserved: /var/lib/trellis/src, /var/cache/trellis/aur"
+    @echo "ℹ️  Cache and stages directories preserved: /var/lib/trellis/stages, /var/cache/trellis/aur"
     @echo "ℹ️  Run 'just uninstall-hooks' to remove system hooks"
     @echo "ℹ️  Remove cache manually if desired: sudo rm -rf /var/lib/trellis /var/cache/trellis"
 

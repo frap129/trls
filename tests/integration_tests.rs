@@ -30,7 +30,7 @@ fn test_build_builder_no_stages() {
     let mut cmd = Command::cargo_bin("trls").unwrap();
     cmd.arg("--skip-root-check");
     // Don't override builder-stages, so it should use empty default when no config
-    cmd.arg("--src-dir")
+    cmd.arg("--stages-dir")
         .arg(temp_dir.path())
         .arg("build-builder");
 
@@ -49,7 +49,7 @@ fn test_build_no_stages() {
     let mut cmd = Command::cargo_bin("trls").unwrap();
     cmd.arg("--skip-root-check");
     // Don't override rootfs-stages, so it should use empty default when no config
-    cmd.arg("--src-dir").arg(temp_dir.path()).arg("build");
+    cmd.arg("--stages-dir").arg(temp_dir.path()).arg("build");
 
     // The error will depend on whether system config exists
     cmd.assert().failure().stderr(
@@ -64,7 +64,7 @@ fn test_build_builder_with_missing_containerfile() {
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
     cmd.arg("--skip-root-check");
-    cmd.arg("--src-dir")
+    cmd.arg("--stages-dir")
         .arg(temp_dir.path())
         .arg("--builder-stages")
         .arg("base")
@@ -81,7 +81,7 @@ fn test_build_with_missing_containerfile() {
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
     cmd.arg("--skip-root-check");
-    cmd.arg("--src-dir")
+    cmd.arg("--stages-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-stages")
         .arg("base")
@@ -95,8 +95,11 @@ fn test_build_with_missing_containerfile() {
 #[test]
 fn test_clean_command() {
     // Test that clean command runs and provides appropriate output
+    let temp_dir = TempDir::new().unwrap();
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.arg("--skip-root-check");
+    cmd.arg("--skip-root-check")
+        .arg("--stages-dir")
+        .arg(temp_dir.path());
     cmd.arg("clean");
 
     let output = cmd.output().unwrap();
@@ -117,8 +120,11 @@ fn test_clean_command() {
 #[test]
 fn test_clean_command_with_custom_tags() {
     // Test that clean command works with custom tags
+    let temp_dir = TempDir::new().unwrap();
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    cmd.arg("--skip-root-check");
+    cmd.arg("--skip-root-check")
+        .arg("--stages-dir")
+        .arg(temp_dir.path());
     cmd.arg("--builder-tag")
         .arg("custom-builder")
         .arg("--rootfs-tag")
@@ -147,7 +153,7 @@ fn test_config_override_builder_tag() {
     cmd.arg("--skip-root-check");
     cmd.arg("--builder-tag")
         .arg("custom-builder")
-        .arg("--src-dir")
+        .arg("--stages-dir")
         .arg(temp_dir.path())
         .arg("--builder-stages")
         .arg("base")
@@ -166,7 +172,7 @@ fn test_config_override_rootfs_tag() {
     cmd.arg("--skip-root-check");
     cmd.arg("--rootfs-tag")
         .arg("custom-rootfs")
-        .arg("--src-dir")
+        .arg("--stages-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-stages")
         .arg("base")
@@ -194,7 +200,7 @@ fn test_update_command() {
     let temp_dir = TempDir::new().unwrap();
     let mut cmd = Command::cargo_bin("trls").unwrap();
     cmd.arg("--skip-root-check");
-    cmd.arg("--src-dir").arg(temp_dir.path()).arg("update");
+    cmd.arg("--stages-dir").arg(temp_dir.path()).arg("update");
 
     // This will likely fail since we don't have stages defined, but it tests the command
     cmd.assert().failure().stderr(
@@ -209,7 +215,7 @@ fn test_multiple_stages() {
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
     cmd.arg("--skip-root-check");
-    cmd.arg("--src-dir")
+    cmd.arg("--stages-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-stages")
         .arg("base,tools,final")
@@ -226,7 +232,7 @@ fn test_extra_contexts() {
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
     cmd.arg("--skip-root-check");
-    cmd.arg("--src-dir")
+    cmd.arg("--stages-dir")
         .arg(temp_dir.path())
         .arg("--extra-contexts")
         .arg("mycontext=/path/to/context")
@@ -245,7 +251,7 @@ fn test_extra_mounts() {
 
     let mut cmd = Command::cargo_bin("trls").unwrap();
     cmd.arg("--skip-root-check");
-    cmd.arg("--src-dir")
+    cmd.arg("--stages-dir")
         .arg(temp_dir.path())
         .arg("--extra-mounts")
         .arg("/tmp,/var/tmp")

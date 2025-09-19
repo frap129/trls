@@ -21,32 +21,32 @@ struct ContainerfileCacheEntry {
 /// LRU cache for containerfile discovery with directory modification time tracking
 struct ContainerfileCache {
     cache: LruCache<String, ContainerfileCacheEntry>,
-    src_dir_mtime: Option<SystemTime>,
+    stages_dir_mtime: Option<SystemTime>,
 }
 
 impl ContainerfileCache {
     fn new() -> Self {
         Self {
             cache: LruCache::new(std::num::NonZeroUsize::new(100).unwrap()),
-            src_dir_mtime: None,
+            stages_dir_mtime: None,
         }
     }
 
-    fn is_valid(&self, src_dir: &PathBuf) -> bool {
-        if let Ok(metadata) = fs::metadata(src_dir) {
+    fn is_valid(&self, stages_dir: &PathBuf) -> bool {
+        if let Ok(metadata) = fs::metadata(stages_dir) {
             if let Ok(current_mtime) = metadata.modified() {
                 return self
-                    .src_dir_mtime
+                    .stages_dir_mtime
                     .is_some_and(|cached_mtime| cached_mtime >= current_mtime);
             }
         }
         false
     }
 
-    fn update_src_dir_mtime(&mut self, src_dir: &PathBuf) {
-        if let Ok(metadata) = fs::metadata(src_dir) {
+    fn update_stages_dir_mtime(&mut self, stages_dir: &PathBuf) {
+        if let Ok(metadata) = fs::metadata(stages_dir) {
             if let Ok(mtime) = metadata.modified() {
-                self.src_dir_mtime = Some(mtime);
+                self.stages_dir_mtime = Some(mtime);
             }
         }
     }
@@ -62,7 +62,7 @@ impl ContainerfileCache {
 
     fn invalidate(&mut self) {
         self.cache.clear();
-        self.src_dir_mtime = None;
+        self.stages_dir_mtime = None;
     }
 }
 
@@ -99,9 +99,9 @@ impl<'a> ContainerfileDiscovery<'a> {
         let mut cache = self.cache.borrow_mut();
 
         // Check if cache is still valid
-        if !cache.is_valid(&self.config.src_dir) {
+        if !cache.is_valid(&self.config.stages_dir) {
             cache.invalidate();
-            cache.update_src_dir_mtime(&self.config.src_dir);
+            cache.update_stages_dir_mtime(&self.config.stages_dir);
         }
 
         // Check cache first
@@ -134,7 +134,7 @@ impl<'a> ContainerfileDiscovery<'a> {
         // - Automatic cycle detection
         // - Depth limiting
         // - Error handling for inaccessible directories
-        let walker = WalkDir::new(&self.config.src_dir)
+        let walker = WalkDir::new(&self.config.stages_dir)
             .max_depth(patterns::MAX_SEARCH_DEPTH) // Reasonable depth limit to prevent runaway searches
             .follow_links(false) // Don't follow symlinks to avoid cycles
             .into_iter()
@@ -165,8 +165,8 @@ impl<'a> ContainerfileDiscovery<'a> {
                  Ensure the file exists and has correct permissions. \
                  Use 'find {} -name \"{}\"' to verify file location.",
                 errors::CONTAINERFILE_NOT_FOUND,
-                self.config.src_dir.display(),
-                self.config.src_dir.display(),
+                self.config.stages_dir.display(),
+                self.config.stages_dir.display(),
                 filename
             ));
         }
@@ -203,7 +203,7 @@ impl<'a> ContainerfileDiscovery<'a> {
         let mut remaining: HashSet<String> = groups.iter().cloned().collect();
 
         // Use walkdir for efficient directory traversal
-        let walker = WalkDir::new(&self.config.src_dir)
+        let walker = WalkDir::new(&self.config.stages_dir)
             .max_depth(patterns::MAX_SEARCH_DEPTH)
             .follow_links(false)
             .into_iter()

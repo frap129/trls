@@ -15,5 +15,5 @@ extra_mounts = []
 [environment]
 pacman_cache = "/var/cache/pacman/pkg"
 aur_cache = "/var/cache/trellis/aur"
-src_dir = "/var/lib/trellis/src"
+stages_dir = "/var/lib/trellis/stages"
 hooks_dir = "/etc/trellis/hooks.d"

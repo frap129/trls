@@ -8,8 +8,8 @@ pub mod paths {
     /// Default location for trellis hooks directory
     pub const DEFAULT_HOOKS_DIR: &str = "/etc/trellis/hooks.d";
 
-    /// Default source directory for containerfiles
-    pub const DEFAULT_SRC_DIR: &str = "/var/lib/trellis/src";
+    /// Default stages directory for containerfiles
+    pub const DEFAULT_STAGES_DIR: &str = "/var/lib/trellis/stages";
 
     /// Default pacman cache directory
     pub const DEFAULT_PACMAN_CACHE: &str = "/var/cache/pacman/pkg";

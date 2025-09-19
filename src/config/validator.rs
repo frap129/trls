@@ -63,19 +63,19 @@ impl ConfigValidator {
     ///
     /// Returns an error if any path validation fails
     fn validate_paths(config: &TrellisConfig) -> Result<()> {
-        // Validate source directory exists
-        if !config.src_dir.exists() {
+        // Validate stages directory exists
+        if !config.stages_dir.exists() {
             return Err(anyhow!(
-                "Source directory does not exist: {}",
-                config.src_dir.display()
+                "Stages directory does not exist: {}",
+                config.stages_dir.display()
             ));
         }
 
-        // Validate source directory is actually a directory
-        if !config.src_dir.is_dir() {
+        // Validate stages directory is actually a directory
+        if !config.stages_dir.is_dir() {
             return Err(anyhow!(
-                "Source path is not a directory: {}",
-                config.src_dir.display()
+                "Stages path is not a directory: {}",
+                config.stages_dir.display()
             ));
         }
 
@@ -156,7 +156,7 @@ mod tests {
             auto_clean: false,
             pacman_cache: None,
             aur_cache: None,
-            src_dir: temp_dir.path().to_path_buf(),
+            stages_dir: temp_dir.path().to_path_buf(),
             hooks_dir: None,
             quiet: false,
         };
@@ -194,9 +194,9 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_paths_nonexistent_src_dir() {
+    fn test_validate_paths_nonexistent_stages_dir() {
         let (mut config, _temp_dir) = create_test_config();
-        config.src_dir = PathBuf::from("/nonexistent/path");
+        config.stages_dir = PathBuf::from("/nonexistent/path");
 
         let result = ConfigValidator::validate_paths(&config);
         assert!(result.is_err());
@@ -255,7 +255,7 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_paths_src_dir_is_file() {
+    fn test_validate_paths_stages_dir_is_file() {
         use std::fs::File;
 
         let temp_dir = TempDir::new().unwrap();
@@ -263,7 +263,7 @@ mod tests {
         File::create(&file_path).unwrap();
 
         let (mut config, _temp_dir) = create_test_config();
-        config.src_dir = file_path;
+        config.stages_dir = file_path;
 
         let result = ConfigValidator::validate_paths(&config);
         assert!(result.is_err());
@@ -322,7 +322,7 @@ mod tests {
     #[test]
     fn test_validate_complete_with_path_error() {
         let (mut config, _temp_dir) = create_test_config();
-        config.src_dir = PathBuf::from("/nonexistent/path");
+        config.stages_dir = PathBuf::from("/nonexistent/path");
 
         let result = ConfigValidator::validate_complete(&config);
         assert!(result.is_err());
