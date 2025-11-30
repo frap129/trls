@@ -4,4 +4,6 @@ pub mod trellis;
 
 // Re-export main types for easier access
 pub use trellis::discovery::ContainerfileDiscovery;
-pub use trellis::{ContainerBuilder, ContainerRunner, ImageCleaner, Trellis, TrellisApp};
+pub use trellis::{
+    resolve_image_tag, ContainerBuilder, ContainerRunner, ImageCleaner, Trellis, TrellisApp,
+};

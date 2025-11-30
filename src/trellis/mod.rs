@@ -16,7 +16,9 @@ use crate::{
 
 use common::TrellisMessaging;
 use executor::{CommandExecutor, RealCommandExecutor};
+use image_generator::ImageGenerator;
 use std::io::{self, BufRead};
+use std::path::PathBuf;
 
 /// Trait for handling user interactions like prompts and confirmations.
 /// This allows for dependency injection and mocking in tests.
@@ -60,10 +62,12 @@ pub mod common;
 pub mod constants;
 pub mod discovery;
 pub mod executor;
+pub mod image_generator;
 pub mod runner;
 
 pub use builder::ContainerBuilder;
 pub use cleaner::ImageCleaner;
+pub use image_generator::resolve_image_tag;
 pub use runner::ContainerRunner;
 
 /// Main application struct that coordinates all trellis operations.
@@ -129,6 +133,19 @@ impl TrellisApp {
             Commands::Clean => trellis.clean(),
             Commands::Update => trellis.update(),
             Commands::QuickUpdate => trellis.quick_update_rootfs(),
+            Commands::Image {
+                build,
+                image,
+                output,
+                filesystem,
+                size,
+            } => trellis.generate_bootable_image(
+                *build,
+                image.as_deref(),
+                output.clone(),
+                filesystem,
+                *size,
+            ),
         }
     }
 }
@@ -233,7 +250,34 @@ impl<'a> Trellis<'a> {
         self.runner.quick_update_rootfs()
     }
 
-    /// Checks if the builder container exists using podman images.
+    /// Generate a bootable disk image from a container image.
+    ///
+    /// # Arguments
+    ///
+    /// * `build_first` - Whether to build the rootfs container first
+    /// * `image_tag` - Optional image tag (uses config default if None)
+    /// * `output_path` - Optional output path (uses bootable.img if None)
+    /// * `filesystem` - Filesystem type for the image
+    /// * `size_gb` - Size of the image in gigabytes
+    pub fn generate_bootable_image(
+        &self,
+        build_first: bool,
+        image_tag: Option<&str>,
+        output_path: Option<PathBuf>,
+        filesystem: &str,
+        size_gb: u64,
+    ) -> Result<()> {
+        // Optionally build first
+        if build_first {
+            self.build_rootfs_container()?;
+        }
+
+        let resolved_image_tag = resolve_image_tag(self.config, image_tag);
+        let output = output_path.unwrap_or_else(|| PathBuf::from("bootable.img"));
+
+        let generator = ImageGenerator::new(self.config, Arc::clone(&self.executor));
+        generator.generate_bootable_image(&resolved_image_tag, &output, filesystem, size_gb)
+    }
     ///
     /// # Returns
     ///

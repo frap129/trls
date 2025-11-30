@@ -8,3 +8,4 @@ Cargo.lock
 /coverage/
 CLAUDE.md
 AGENTS.md
+*.log

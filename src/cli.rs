@@ -86,4 +86,26 @@ pub enum Commands {
     Update,
     /// Update packages in the rootfs container using topgrade
     QuickUpdate,
+    /// Generate bootable disk images from built containers
+    Image {
+        /// Build the image before generation (uses config defaults + global flags)
+        #[arg(long)]
+        build: bool,
+
+        /// Image tag to use (default: rootfs_tag:latest from config)
+        #[arg(long)]
+        image: Option<String>,
+
+        /// Output path for the generated image (default: ./bootable.img)
+        #[arg(long)]
+        output: Option<PathBuf>,
+
+        /// Filesystem type (default: ext4)
+        #[arg(long, default_value = "ext4")]
+        filesystem: String,
+
+        /// Image size in GB (default: 20)
+        #[arg(long, default_value_t = 20)]
+        size: u64,
+    },
 }
