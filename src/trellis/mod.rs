@@ -260,7 +260,7 @@ impl<'a> Trellis<'a> {
     /// * `image_tag` - Optional image tag (uses config default if None)
     /// * `output_path` - Optional output path (uses bootable.img if None)
     /// * `filesystem` - Filesystem type for the image
-    /// * `size_gb` - Size of the image in gigabytes
+    /// * `size_gb` - Optional size in GB (automatically calculated if None)
     /// * `root_password` - Optional root password to set in the generated image
     pub fn generate_bootable_image(
         &self,
@@ -268,13 +268,15 @@ impl<'a> Trellis<'a> {
         image_tag: Option<&str>,
         output_path: Option<PathBuf>,
         filesystem: &str,
-        size_gb: u64,
+        size_gb: Option<u64>,
         root_password: Option<&str>,
     ) -> Result<()> {
         // Display security warning if root password is provided
         if root_password.is_some() {
             self.warning("Security notice: Password provided via command-line is visible in process list and shell history");
-            self.warning("Consider using environment variables or password files for production use");
+            self.warning(
+                "Consider using environment variables or password files for production use",
+            );
         }
 
         // Optionally build first

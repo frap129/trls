@@ -269,7 +269,7 @@ fn test_root_password_shows_security_warning() {
     // Test that using --root-password displays the security warning
     let temp_dir = TempDir::new().unwrap();
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    
+
     cmd.arg("--skip-root-check")
         .arg("--stages-dir")
         .arg(temp_dir.path())
@@ -278,18 +278,18 @@ fn test_root_password_shows_security_warning() {
         .arg("image")
         .arg("--root-password")
         .arg("test_password");
-    
+
     // This will fail due to missing containerfiles, but the warning should still be shown
     // in stderr before the error message
     let output = cmd.output().unwrap();
     let stderr_str = String::from_utf8_lossy(&output.stderr);
-    
+
     // The security warning should be displayed
     assert!(
         stderr_str.contains("Security notice: Password provided via command-line is visible in process list and shell history"),
         "Expected security warning about password visibility, got stderr: '{stderr_str}'"
     );
-    
+
     // Also check for the follow-up advice
     assert!(
         stderr_str.contains("Consider using environment variables or password files for production use"),
@@ -302,17 +302,17 @@ fn test_no_warning_without_root_password() {
     // Test that the security warning does NOT appear when --root-password is not used
     let temp_dir = TempDir::new().unwrap();
     let mut cmd = Command::cargo_bin("trls").unwrap();
-    
+
     cmd.arg("--skip-root-check")
         .arg("--stages-dir")
         .arg(temp_dir.path())
         .arg("--rootfs-stages")
         .arg("base")
         .arg("image");
-    
+
     let output = cmd.output().unwrap();
     let stderr_str = String::from_utf8_lossy(&output.stderr);
-    
+
     // The security warning should NOT be displayed when no password is provided
     assert!(
         !stderr_str.contains("Security notice: Password provided via command-line"),

@@ -104,9 +104,9 @@ pub enum Commands {
         #[arg(long, default_value = "ext4")]
         filesystem: String,
 
-        /// Image size in GB (default: 20)
-        #[arg(long, default_value_t = 20)]
-        size: u64,
+        /// Image size in GB (automatic if not specified)
+        #[arg(long)]
+        size: Option<u64>,
 
         /// Root password to set in the generated image
         ///

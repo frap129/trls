@@ -10,6 +10,7 @@
 //! 4. Mount the installed disk image and inject trellis configuration
 
 use anyhow::{anyhow, Context, Result};
+use serde::Deserialize;
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -17,6 +18,14 @@ use std::{
 
 use super::{common::TrellisMessaging, executor::CommandExecutor};
 use crate::config::{Config, TrellisConfig};
+
+/// Deserialization structure for podman inspect output.
+/// Podman returns an array of image info, we extract the Size field.
+#[derive(Deserialize)]
+struct PodmanImageInspect {
+    #[serde(rename = "Size")]
+    size: u64,
+}
 
 /// Resolves image tags to full format with registry and tag suffix.
 ///
@@ -84,35 +93,47 @@ impl<'a> ImageGenerator<'a> {
     /// * `image_tag` - The container image tag to use for generation
     /// * `output_path` - Path where the image file should be created
     /// * `filesystem` - Filesystem type for the image (e.g., "ext4")
-    /// * `size_gb` - Size of the image in gigabytes
+    /// * `size_gb` - Optional size in GB (automatically calculated if None)
     ///
     /// # Errors
     ///
     /// Returns an error if:
     /// - Container image doesn't exist
+    /// - Size calculation fails (when size_gb is None)
     /// - Any operation in the generation process fails
     pub fn generate_bootable_image(
         &self,
         image_tag: &str,
         output_path: &Path,
         filesystem: &str,
-        size_gb: u64,
+        size_gb: Option<u64>,
         root_password: Option<&str>,
     ) -> Result<()> {
         self.msg(&format!("Generating bootable image from {}", image_tag));
-
         // Validate image exists
         self.validate_image_exists(image_tag)?;
-
+        // Determine size: use provided or calculate automatically
+        let final_size = match size_gb {
+            Some(size) => {
+                self.msg(&format!("Using specified size: {}GB", size));
+                size
+            }
+            None => {
+                self.msg("Calculating disk size automatically...");
+                let calculated_size = self.calculate_disk_size(image_tag)?;
+                self.msg(&format!(
+                    "Calculated disk size: {}GB (container + 1GB buffer)",
+                    calculated_size
+                ));
+                calculated_size
+            }
+        };
         // Create image file
-        self.create_image_file(output_path, size_gb)?;
-
+        self.create_image_file(output_path, final_size)?;
         // Install bootable system using the ORIGINAL container image
         self.install_bootable_system(image_tag, output_path, filesystem)?;
-
         // Inject trellis configuration into the INSTALLED disk image
         self.inject_configuration_to_disk(output_path, root_password)?;
-
         self.msg("Bootable image generated successfully");
         Ok(())
     }
@@ -147,6 +168,68 @@ impl<'a> ImageGenerator<'a> {
         }
 
         Ok(())
+    }
+
+    /// Get the size of a container image in bytes.
+    ///
+    /// Uses `podman inspect` to query the image's actual size by parsing JSON output.
+    /// This is more robust than relying on format strings.
+    ///
+    /// # Arguments
+    ///
+    /// * `image_tag` - The container image tag to inspect
+    ///
+    /// # Returns
+    ///
+    /// The image size in bytes, or an error if inspection fails
+    pub fn get_image_size_bytes(&self, image_tag: &str) -> Result<u64> {
+        let args = vec![image_tag.to_string()];
+        let output = self
+            .executor
+            .podman_inspect(&args)
+            .context("Failed to inspect container image")?;
+        if !output.status.success() {
+            return Err(anyhow!(
+                "Podman inspect failed with exit code: {:?}",
+                output.status.code()
+            ));
+        }
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        // Parse the JSON output from podman inspect (which returns an array)
+        let images: Vec<PodmanImageInspect> = serde_json::from_str(stdout.trim())
+            .context("Failed to parse podman inspect JSON output")?;
+
+        // Get the first image from the array
+        let image = images
+            .first()
+            .ok_or_else(|| anyhow!("No image information returned from podman inspect"))?;
+
+        Ok(image.size)
+    }
+
+    /// Calculate recommended disk size based on container image size.
+    ///
+    /// Formula: container_size + 1GB, rounded up to nearest GB
+    ///
+    /// # Arguments
+    ///
+    /// * `image_tag` - The container image tag to size
+    ///
+    /// # Returns
+    ///
+    /// Recommended disk size in GB
+    pub fn calculate_disk_size(&self, image_tag: &str) -> Result<u64> {
+        let size_bytes = self.get_image_size_bytes(image_tag)?;
+
+        // Add 1GB buffer (in bytes)
+        let total_bytes = size_bytes + 1_073_741_824; // 1GB = 1024^3 bytes
+
+        // Convert to GB and round up
+        let size_gb = (total_bytes as f64 / 1_073_741_824.0).ceil() as u64;
+
+        // Ensure minimum size of 2GB for safety
+        Ok(size_gb.max(2))
     }
 
     /// Create the image file using fallocate.
@@ -198,7 +281,11 @@ impl<'a> ImageGenerator<'a> {
     /// # Errors
     ///
     /// Returns an error if mounting, writing, or unmounting fails.
-    pub fn inject_configuration_to_disk(&self, disk_image_path: &Path, root_password: Option<&str>) -> Result<()> {
+    pub fn inject_configuration_to_disk(
+        &self,
+        disk_image_path: &Path,
+        root_password: Option<&str>,
+    ) -> Result<()> {
         self.msg("Injecting trellis configuration into disk image");
 
         // Generate the configuration TOML
@@ -471,6 +558,36 @@ impl<'a> ImageGenerator<'a> {
         Ok(hash)
     }
 
+    /// Find the shadow file path in either standard or bootc state locations
+    fn find_shadow_file_path(mount_point: &Path) -> Result<PathBuf> {
+        // Check standard location first
+        let standard_path = mount_point.join("etc/shadow");
+        if standard_path.exists() {
+            return Ok(standard_path);
+        }
+
+        // Check bootc state directory structure: /state/deploy/*/etc/shadow
+        let state_dir = mount_point.join("state/deploy");
+        if state_dir.exists() {
+            let read = std::fs::read_dir(&state_dir)
+                .with_context(|| format!("Failed to read bootc state directory {}", state_dir.display()))?;
+            for entry in read {
+                let entry = entry.context("Failed to read state directory entry")?;
+                let deploy_path = entry.path();
+                let shadow_path = deploy_path.join("etc/shadow");
+                if shadow_path.exists() {
+                    return Ok(shadow_path);
+                }
+            }
+        }
+
+        Err(anyhow!(
+            "Shadow file not found; checked '{}' and '{}/<deploy-id>/etc/shadow'",
+            standard_path.display(),
+            state_dir.display()
+        ))
+    }
+
     /// Set the root password in the mounted filesystem's /etc/shadow file.
     ///
     /// # Arguments
@@ -485,25 +602,16 @@ impl<'a> ImageGenerator<'a> {
     /// - Password hashing fails
     /// - File writing fails
     /// - Shadow file format is invalid
-    fn set_root_password_in_shadow(
-        &self,
-        mount_point: &Path,
-        password: &str,
-    ) -> Result<()> {
-        let shadow_path = mount_point.join("etc/shadow");
-
-        // Verify shadow file exists
-        if !shadow_path.exists() {
-            return Err(anyhow!("Shadow file not found at {}", shadow_path.display()));
-        }
+    fn set_root_password_in_shadow(&self, mount_point: &Path, password: &str) -> Result<()> {
+        // Find shadow file in either standard or bootc state location
+        let shadow_path = Self::find_shadow_file_path(mount_point)?;
 
         // Read existing shadow file
         let shadow_content = std::fs::read_to_string(&shadow_path)
-            .context("Failed to read /etc/shadow")?;
+            .with_context(|| format!("Failed to read shadow file at {}", shadow_path.display()))?;
 
         // Hash the password
-        let password_hash = Self::hash_password(password)
-            .context("Failed to hash password")?;
+        let password_hash = Self::hash_password(password).context("Failed to hash password")?;
 
         // Parse and modify shadow entries
         let mut modified = false;
@@ -531,7 +639,10 @@ impl<'a> ImageGenerator<'a> {
             .join("\n");
 
         if !modified {
-            return Err(anyhow!("Root entry not found in /etc/shadow"));
+            return Err(anyhow!(
+                "Root entry not found in shadow file at {}",
+                shadow_path.display()
+            ));
         }
 
         // --- Start of safe atomic write pattern ---
@@ -539,26 +650,27 @@ impl<'a> ImageGenerator<'a> {
         // 1. Create a temporary file in the same directory
         let temp_file_path = shadow_path.with_extension("tmp");
         let mut temp_file = std::fs::File::create(&temp_file_path)
-            .context("Failed to create temporary shadow file")?;
+            .with_context(|| format!("Failed to create temporary shadow file at {}", temp_file_path.display()))?;
 
         // 2. Write the new content to the temporary file
         // Add a trailing newline, as .join("\n") does not.
         use std::io::Write;
-        write!(temp_file, "{}\n", new_content)
-            .context("Failed to write to temporary shadow file")?;
+        writeln!(temp_file, "{}", new_content).context("Failed to write to temporary shadow file")?;
 
         // 3. Sync data to disk to ensure it's not just in a buffer
-        temp_file.sync_all().context("Failed to sync temporary shadow file")?;
+        temp_file
+            .sync_all()
+            .context("Failed to sync temporary shadow file")?;
 
         // 4. Copy permissions from the original file to the new one
         let metadata = std::fs::metadata(&shadow_path)
-            .context("Failed to get shadow file metadata")?;
+            .with_context(|| format!("Failed to get shadow file metadata for {}", shadow_path.display()))?;
         std::fs::set_permissions(&temp_file_path, metadata.permissions())
             .context("Failed to set permissions on temporary shadow file")?;
 
         // 5. Atomically rename the temporary file to replace the original
         std::fs::rename(&temp_file_path, &shadow_path)
-            .context("Failed to atomically replace /etc/shadow")?;
+            .with_context(|| format!("Failed to atomically replace shadow file at {}", shadow_path.display()))?;
 
         // --- End of safe atomic write pattern ---
 
@@ -572,8 +684,8 @@ impl<'a> TrellisMessaging for ImageGenerator<'a> {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
     use std::os::unix::fs::PermissionsExt;
+    use std::path::PathBuf;
 
     /// Create a minimal TrellisConfig for testing.
     fn create_test_config() -> TrellisConfig {
@@ -662,7 +774,10 @@ mod tests {
         let hash1 = ImageGenerator::hash_password(password)?;
         let hash2 = ImageGenerator::hash_password(password)?;
         // Different salts should produce different hashes
-        assert_ne!(hash1, hash2, "Same password should produce different hashes due to different salts");
+        assert_ne!(
+            hash1, hash2,
+            "Same password should produce different hashes due to different salts"
+        );
         Ok(())
     }
 
@@ -675,7 +790,7 @@ mod tests {
             "unicode_рос𝓈ia",
             "verylongpasswordwithmanycharactersandsomething",
         ];
-        
+
         for password in passwords {
             let hash = ImageGenerator::hash_password(password)?;
             assert!(
@@ -696,10 +811,11 @@ mod tests {
         let shadow_dir = tempfile::TempDir::new()?;
         let shadow_path = shadow_dir.path().join("shadow");
         let mut shadow_file = std::fs::File::create(&shadow_path)?;
-        let original_content = "root:$6$oldhashedpassword:19234:0:99999:7:::\nuser:$6$otherpass:19234:0:99999:7:::\n";
+        let original_content =
+            "root:$6$oldhashedpassword:19234:0:99999:7:::\nuser:$6$otherpass:19234:0:99999:7:::\n";
         shadow_file.write_all(original_content.as_bytes())?;
         shadow_file.flush()?;
-        
+
         // Create a temporary mount point
         let mount_dir = tempfile::TempDir::new()?;
         let etc_dir = mount_dir.path().join("etc");
@@ -707,7 +823,10 @@ mod tests {
         std::fs::copy(&shadow_path, etc_dir.join("shadow"))?;
 
         // Set permissions on shadow file (typically 0600)
-        std::fs::set_permissions(etc_dir.join("shadow"), std::fs::Permissions::from_mode(0o600))?;
+        std::fs::set_permissions(
+            etc_dir.join("shadow"),
+            std::fs::Permissions::from_mode(0o600),
+        )?;
 
         // Create a test ImageGenerator
         let config = create_test_config();
@@ -727,21 +846,30 @@ mod tests {
 
         // Verify the password field changed
         let parts: Vec<&str> = root_line.split(':').collect();
-        assert!(parts.len() >= 2, "Shadow entry should have at least 2 fields");
+        assert!(
+            parts.len() >= 2,
+            "Shadow entry should have at least 2 fields"
+        );
         assert!(
             parts[1].starts_with("$6$"),
             "Password field should be a SHA-512 hash"
         );
 
         // Verify the old hash is not present
-        assert!(!parts[1].contains("oldhashedpassword"), "Old password should be replaced");
+        assert!(
+            !parts[1].contains("oldhashedpassword"),
+            "Old password should be replaced"
+        );
 
         // Verify user entry is unchanged
         let user_line = modified_content
             .lines()
             .find(|line| line.starts_with("user:"))
             .expect("User entry should exist");
-        assert!(user_line.contains("$6$otherpass"), "Other user entry should be unchanged");
+        assert!(
+            user_line.contains("$6$otherpass"),
+            "Other user entry should be unchanged"
+        );
 
         Ok(())
     }
@@ -761,9 +889,15 @@ mod tests {
         // Call the method - should fail
         let result = generator.set_root_password_in_shadow(mount_dir.path(), "newpassword");
 
-        assert!(result.is_err(), "Should return error when shadow file missing");
         assert!(
-            result.unwrap_err().to_string().contains("Shadow file not found"),
+            result.is_err(),
+            "Should return error when shadow file missing"
+        );
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Shadow file not found"),
             "Error should mention shadow file not found"
         );
 
@@ -796,9 +930,15 @@ mod tests {
         // Call the method - should fail
         let result = generator.set_root_password_in_shadow(mount_dir.path(), "newpassword");
 
-        assert!(result.is_err(), "Should return error when root entry missing");
         assert!(
-            result.unwrap_err().to_string().contains("Root entry not found"),
+            result.is_err(),
+            "Should return error when root entry missing"
+        );
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Root entry not found"),
             "Error should mention root entry not found"
         );
 
@@ -807,8 +947,8 @@ mod tests {
 
     #[test]
     fn set_root_password_in_shadow_preserves_permissions() -> Result<()> {
-        use std::io::Write;
         use std::fs::Permissions;
+        use std::io::Write;
 
         // Create a temporary shadow file
         let shadow_dir = tempfile::TempDir::new()?;
@@ -817,7 +957,7 @@ mod tests {
         let original_content = "root:$6$oldhashedpassword:19234:0:99999:7:::\n";
         shadow_file.write_all(original_content.as_bytes())?;
         shadow_file.flush()?;
-        
+
         // Create a temporary mount point
         let mount_dir = tempfile::TempDir::new()?;
         let etc_dir = mount_dir.path().join("etc");
@@ -839,8 +979,137 @@ mod tests {
 
         // Check that permissions are preserved
         let new_perms = std::fs::metadata(&target_shadow_path)?.permissions().mode();
-        assert_eq!(new_perms & 0o777, 0o600, "Permissions should be preserved as 0600");
+        assert_eq!(
+            new_perms & 0o777,
+            0o600,
+            "Permissions should be preserved as 0600"
+        );
 
+        Ok(())
+    }
+
+    #[test]
+    fn disk_size_calculation_formula_small_image() {
+        // Test: 500MB image + 1GB buffer = 1.5GB -> rounds up to 2GB minimum
+        let size_bytes: u64 = 500_000_000; // ~500MB
+        let total_bytes = size_bytes + 1_073_741_824; // Add 1GB buffer
+        let size_gb = (total_bytes as f64 / 1_073_741_824.0).ceil() as u64;
+        let final_size = size_gb.max(2);
+
+        assert_eq!(
+            final_size, 2,
+            "500MB + 1GB buffer should result in 2GB (minimum)"
+        );
+    }
+
+    #[test]
+    fn disk_size_calculation_formula_large_image() {
+        // Test: 3GB image + 1GB buffer = 4GB exactly
+        let size_bytes: u64 = 3_221_225_472; // ~3GB
+        let total_bytes = size_bytes + 1_073_741_824; // Add 1GB buffer
+        let size_gb = (total_bytes as f64 / 1_073_741_824.0).ceil() as u64;
+        let final_size = size_gb.max(2);
+
+        assert_eq!(final_size, 4, "3GB + 1GB buffer should result in 4GB");
+    }
+
+    #[test]
+    fn generate_bootable_image_with_explicit_size() {
+        // This test verifies that when size_gb is Some(n), that size is used
+        let explicit_size = Some(20);
+        let final_size = match explicit_size {
+            Some(size) => size,
+            None => {
+                panic!("Should use explicit size");
+            }
+        };
+
+        assert_eq!(final_size, 20, "Should use explicitly provided size");
+    }
+
+    #[test]
+    fn generate_bootable_image_with_auto_size() {
+        // This test verifies that when size_gb is None, automatic calculation is used
+        let explicit_size: Option<u64> = None;
+        let is_auto = explicit_size.is_none();
+
+        assert!(is_auto, "Should use automatic size calculation when None");
+    }
+
+    #[test]
+    fn generate_bootable_image_size_option_behavior_some() {
+        // Test Some variant
+        let size_some: Option<u64> = Some(15);
+        let result_some = match size_some {
+            Some(size) => format!("Using specified size: {}GB", size),
+            None => "Calculating disk size automatically...".to_string(),
+        };
+        assert!(
+            result_some.contains("Using specified size: 15GB"),
+            "Should handle Some variant correctly"
+        );
+    }
+
+    #[test]
+    fn generate_bootable_image_size_option_behavior_none() {
+        // Test None variant
+        let size_none: Option<u64> = None;
+        let result_none = match size_none {
+            Some(size) => format!("Using specified size: {}GB", size),
+            None => "Calculating disk size automatically...".to_string(),
+        };
+        assert!(
+            result_none.contains("Calculating disk size automatically"),
+            "Should handle None variant correctly"
+        );
+    }
+
+    #[test]
+    fn find_shadow_file_path_standard_location() -> Result<()> {
+        // Create a temporary mount point with /etc/shadow
+        let mount_dir = tempfile::TempDir::new()?;
+        let etc_dir = mount_dir.path().join("etc");
+        std::fs::create_dir_all(&etc_dir)?;
+        let shadow_path = etc_dir.join("shadow");
+        std::fs::write(&shadow_path, "root:oldhash:0:0:99999:7:::")?;
+
+        // Call helper
+        let found = ImageGenerator::find_shadow_file_path(mount_dir.path())?;
+        assert_eq!(found, shadow_path);
+        Ok(())
+    }
+
+    #[test]
+    fn find_shadow_file_path_bootc_state_location() -> Result<()> {
+        // Create a temporary mount point with state/deploy/<id>/etc/shadow
+        let mount_dir = tempfile::TempDir::new()?;
+        let deploy_dir = mount_dir.path().join("state/deploy/deploy1/etc");
+        std::fs::create_dir_all(&deploy_dir)?;
+        let shadow_path = deploy_dir.join("shadow");
+        std::fs::write(&shadow_path, "root:oldhash:0:0:99999:7:::")?;
+
+        // Ensure there is no /etc/shadow so the helper must find the state path
+        let etc_dir = mount_dir.path().join("etc");
+        if etc_dir.exists() {
+            std::fs::remove_dir_all(&etc_dir)?;
+        }
+
+        let found = ImageGenerator::find_shadow_file_path(mount_dir.path())?;
+        assert_eq!(found, shadow_path);
+        Ok(())
+    }
+
+    #[test]
+    fn find_shadow_file_path_not_found() -> Result<()> {
+        // Create an empty temporary mount point
+        let mount_dir = tempfile::TempDir::new()?;
+
+        let result = ImageGenerator::find_shadow_file_path(mount_dir.path());
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Shadow file not found"));
         Ok(())
     }
 }

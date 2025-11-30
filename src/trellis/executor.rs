@@ -26,6 +26,9 @@ pub trait CommandExecutor: Send + Sync {
     /// Execute a podman images command.
     fn podman_images(&self, args: &[String]) -> Result<Output>;
 
+    /// Execute a podman inspect command.
+    fn podman_inspect(&self, args: &[String]) -> Result<Output>;
+
     /// Execute a podman rmi command.
     fn podman_rmi(&self, args: &[String]) -> Result<Output>;
 
@@ -96,6 +99,14 @@ impl CommandExecutor for RealCommandExecutor {
     fn podman_images(&self, args: &[String]) -> Result<Output> {
         let output = std::process::Command::new("podman")
             .arg("images")
+            .args(args)
+            .output()?;
+        Ok(output)
+    }
+
+    fn podman_inspect(&self, args: &[String]) -> Result<Output> {
+        let output = std::process::Command::new("podman")
+            .arg("inspect")
             .args(args)
             .output()?;
         Ok(output)

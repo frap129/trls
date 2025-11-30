@@ -46,6 +46,7 @@ mock! {
         fn podman_run(&self, args: &[String]) -> Result<Output>;
         fn podman_run_streaming(&self, args: &[String]) -> Result<ExitStatus>;
         fn podman_images(&self, args: &[String]) -> Result<Output>;
+        fn podman_inspect(&self, args: &[String]) -> Result<Output>;
         fn podman_rmi(&self, args: &[String]) -> Result<Output>;
         fn podman_commit(&self, args: &[String]) -> Result<Output>;
         fn check_command_in_container(&self, container_tag: &str, command: &str) -> Result<bool>;
@@ -323,6 +324,12 @@ impl MockScenarios {
                 }
             });
 
+        // Accept any podman inspect command (multiple times)
+        // Return JSON array with image info
+        mock.expect_podman_inspect()
+            .times(..)
+            .returning(|_| Ok(create_success_output(r#"[{"Size": 1073741824}]"#)));
+
         // Accept any podman rmi command (multiple times)
         mock.expect_podman_rmi()
             .times(..)
@@ -414,6 +421,10 @@ impl MockScenarios {
             }
         });
 
+        mock.expect_podman_inspect()
+            .times(..)
+            .returning(|_| Ok(create_success_output(r#"[{"Size": 1073741824}]"#)));
+
         mock.expect_podman_rmi()
             .times(..)
             .returning(|_| Ok(create_success_output("Image removed successfully")));
@@ -472,23 +483,28 @@ impl MockScenarios {
 
         // Return multiple images for cleanup and handle builder container check
         mock.expect_podman_images()
-            .times(..)
-            .returning(|args| {
-                // Check if this is a builder container existence check
-                if args.iter().any(|arg| arg.contains("--filter")) && 
-                   args.iter().any(|arg| arg.contains("reference=localhost/test-builder")) {
-                    // Return the expected format for builder container check
-                    Ok(create_success_output("localhost/test-builder:latest\n"))
-                } else {
-                    // Return multiple images for cleanup testing
-                    Ok(create_success_output("REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\nlocalhost/test-builder\tlatest\tabc123\t2024-01-01T00:00:00Z\t100MB\nlocalhost/test-rootfs\tlatest\tdef456\t2024-01-01T00:00:00Z\t100MB\nlocalhost/test-builder\tintermediate\tghi789\t2024-01-01T00:00:00Z\t100MB\nlocalhost/test-rootfs\tintermediate\tjkl012\t2024-01-01T00:00:00Z\t100MB\n"))
-                }
-            });
+             .times(..)
+             .returning(|args| {
+                 // Check if this is a builder container existence check
+                 if args.iter().any(|arg| arg.contains("--filter")) && 
+                    args.iter().any(|arg| arg.contains("reference=localhost/test-builder")) {
+                     // Return the expected format for builder container check
+                     Ok(create_success_output("localhost/test-builder:latest\n"))
+                 } else {
+                     // Return multiple images for cleanup testing
+                     Ok(create_success_output("REPOSITORY\tTAG\tIMAGE ID\tCREATED\tSIZE\nlocalhost/test-builder\tlatest\tabc123\t2024-01-01T00:00:00Z\t100MB\nlocalhost/test-rootfs\tlatest\tdef456\t2024-01-01T00:00:00Z\t100MB\nlocalhost/test-builder\tintermediate\tghi789\t2024-01-01T00:00:00Z\t100MB\nlocalhost/test-rootfs\tintermediate\tjkl012\t2024-01-01T00:00:00Z\t100MB\n"))
+                 }
+             });
 
-        // Accept any podman rmi command (multiple times)
-        mock.expect_podman_rmi()
-            .times(..)
-            .returning(|_| Ok(create_success_output("Image removed successfully")));
+         // Accept any podman inspect command (multiple times)
+         mock.expect_podman_inspect()
+             .times(..)
+             .returning(|_| Ok(create_success_output(r#"[{"Size": 1073741824}]"#)));
+
+         // Accept any podman rmi command (multiple times)
+         mock.expect_podman_rmi()
+             .times(..)
+             .returning(|_| Ok(create_success_output("Image removed successfully")));
 
         // Accept any bootc command (multiple times)
         mock.expect_bootc().times(..).returning(|args| {
