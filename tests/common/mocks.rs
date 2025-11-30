@@ -47,6 +47,8 @@ mock! {
         fn podman_run_streaming(&self, args: &[String]) -> Result<ExitStatus>;
         fn podman_images(&self, args: &[String]) -> Result<Output>;
         fn podman_rmi(&self, args: &[String]) -> Result<Output>;
+        fn podman_commit(&self, args: &[String]) -> Result<Output>;
+        fn check_command_in_container(&self, container_tag: &str, command: &str) -> Result<bool>;
         fn bootc(&self, args: &[String]) -> Result<Output>;
         fn bootc_streaming(&self, args: &[String]) -> Result<ExitStatus>;
         fn execute(&self, command: &str, args: &[String]) -> Result<Output>;
@@ -336,6 +338,16 @@ impl MockScenarios {
                 Ok(create_success_output("bootc command executed"))
             }
         });
+
+        // Accept any podman commit command (multiple times)
+        mock.expect_podman_commit()
+            .times(..)
+            .returning(|_| Ok(create_success_output("Image committed successfully")));
+
+        // Accept any check_command_in_container command (multiple times)
+        mock.expect_check_command_in_container()
+            .times(..)
+            .returning(|_, _| Ok(true));
 
         // Accept any execute command (multiple times)
         mock.expect_execute().times(..).returning(|command, args| {

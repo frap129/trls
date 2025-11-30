@@ -355,9 +355,14 @@ fn test_run_bootc_upgrade_upgrade_failure() {
 
 #[test]
 fn test_container_capability_enum() {
-    // Test that the enum exists and can be used
-    let _capability = ContainerCapability::All;
-    // Note: as_str() is private, so we just test the enum exists
+    // Test that the enum variants exist and can be used
+    let _cap1 = ContainerCapability::SysAdmin;
+    let _cap2 = ContainerCapability::DacOverride;
+    let _cap3 = ContainerCapability::Chown;
+    let _cap4 = ContainerCapability::Fowner;
+    let _cap5 = ContainerCapability::Setuid;
+    let _cap6 = ContainerCapability::Setgid;
+    let _cap7 = ContainerCapability::SysPtrace;
 }
 
 #[test]
@@ -376,7 +381,8 @@ fn test_podman_run_command_builder_default() {
 fn test_podman_run_command_builder_chaining() {
     let _builder = PodmanRunCommandBuilder::new()
         .network_host()
-        .add_capability(ContainerCapability::All)
+        .add_capability(ContainerCapability::SysAdmin)
+        .add_capability(ContainerCapability::DacOverride)
         .remove_on_exit()
         .interactive()
         .image("test-image")

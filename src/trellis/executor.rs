@@ -29,6 +29,12 @@ pub trait CommandExecutor: Send + Sync {
     /// Execute a podman rmi command.
     fn podman_rmi(&self, args: &[String]) -> Result<Output>;
 
+    /// Execute a podman commit command.
+    fn podman_commit(&self, args: &[String]) -> Result<Output>;
+
+    /// Check if a command is available in a container.
+    fn check_command_in_container(&self, container_tag: &str, command: &str) -> Result<bool>;
+
     /// Execute a bootc command.
     fn bootc(&self, args: &[String]) -> Result<Output>;
 
@@ -101,6 +107,27 @@ impl CommandExecutor for RealCommandExecutor {
             .args(args)
             .output()?;
         Ok(output)
+    }
+
+    fn podman_commit(&self, args: &[String]) -> Result<Output> {
+        let output = std::process::Command::new("podman")
+            .arg("commit")
+            .args(args)
+            .output()?;
+        Ok(output)
+    }
+
+    fn check_command_in_container(&self, container_tag: &str, command: &str) -> Result<bool> {
+        // Run a test command in the container image to check if command exists
+        let output = std::process::Command::new("podman")
+            .arg("run")
+            .arg("--rm")
+            .arg(format!("localhost/{}", container_tag))
+            .arg("sh")
+            .arg("-c")
+            .arg(format!("which {}", command))
+            .output()?;
+        Ok(output.status.success())
     }
 
     fn bootc(&self, args: &[String]) -> Result<Output> {

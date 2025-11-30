@@ -128,6 +128,7 @@ impl TrellisApp {
             Commands::Run { args } => trellis.run_rootfs_container(args),
             Commands::Clean => trellis.clean(),
             Commands::Update => trellis.update(),
+            Commands::QuickUpdate => trellis.quick_update_rootfs(),
         }
     }
 }
@@ -225,6 +226,11 @@ impl<'a> Trellis<'a> {
     pub fn update(&self) -> Result<()> {
         self.build_rootfs_container()?;
         self.runner.run_bootc_upgrade()
+    }
+
+    /// Performs a quick update of the rootfs container using topgrade.
+    pub fn quick_update_rootfs(&self) -> Result<()> {
+        self.runner.quick_update_rootfs()
     }
 
     /// Checks if the builder container exists using podman images.

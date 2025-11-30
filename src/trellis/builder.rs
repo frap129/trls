@@ -33,6 +33,14 @@ impl PodmanCommandBuilder {
     pub fn new_build_command() -> Self {
         Self::new()
             .build_subcommand()
+            // Use host network namespace (--net host) to enable network access during builds
+            // This is necessary for:
+            // - Package manager repository access (pacman, yay, apt, etc.)
+            // - DNS resolution to reach package mirrors and registries
+            // - Downloading base images and build dependencies
+            // - Running build scripts that may require internet access (git clones, cargo fetch, etc.)
+            // Without host network, Containerfile RUN commands that need to download packages
+            // or access network resources would fail
             .network_host()
             .add_capability("sys_admin")
             .add_capability("mknod")

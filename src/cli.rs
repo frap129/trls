@@ -84,4 +84,6 @@ pub enum Commands {
     Run { args: Vec<String> },
     /// A macro command that runs build and bootc upgrade
     Update,
+    /// Update packages in the rootfs container using topgrade
+    QuickUpdate,
 }
