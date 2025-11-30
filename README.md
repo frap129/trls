@@ -80,6 +80,36 @@ Build rootfs image and perform atomic bootc upgrade (primary workflow):
 trls update
 ```
 
+#### `image`
+
+Generate bootable disk images from built containers:
+
+```bash
+trls image --output my-system.img
+```
+
+Available options:
+- `--build`: Build the image before generation (uses config defaults + global flags)
+- `--image`: Image tag to use (default: rootfs_tag:latest from config)
+- `--output`: Output path for the generated image (default: ./bootable.img)
+- `--filesystem`: Filesystem type (default: ext4)
+- `--size`: Image size in GB (default: 20)
+- `--root-password`: Root password to set in the generated image
+
+##### Setting Root Password
+
+You can set the root password in the generated image:
+
+```bash
+trls image --root-password "<your-secure-password>" --output my-system.img
+```
+
+> **Security Warning**: Passwords provided via command-line are visible in process lists and shell history. For production environments, it is strongly recommended to avoid passing passwords directly on the command line. You can use your shell's `read` command to provide the password without saving it to history:
+>
+> ```bash
+> read -s -p "Enter root password: " ROOT_PASS && trls image --root-password "$ROOT_PASS" --output my-system.img
+> ```
+
 ### Command Line Options
 
 All configuration options can be overridden via command line:

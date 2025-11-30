@@ -107,5 +107,13 @@ pub enum Commands {
         /// Image size in GB (default: 20)
         #[arg(long, default_value_t = 20)]
         size: u64,
+
+        /// Root password to set in the generated image
+        ///
+        /// WARNING: Passwords provided via command-line are visible in process lists
+        /// and shell history. For production use, consider alternatives like environment
+        /// variables or password files.
+        #[arg(long)]
+        root_password: Option<String>,
     },
 }

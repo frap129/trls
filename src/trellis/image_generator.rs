@@ -97,6 +97,7 @@ impl<'a> ImageGenerator<'a> {
         output_path: &Path,
         filesystem: &str,
         size_gb: u64,
+        root_password: Option<&str>,
     ) -> Result<()> {
         self.msg(&format!("Generating bootable image from {}", image_tag));
 
@@ -110,7 +111,7 @@ impl<'a> ImageGenerator<'a> {
         self.install_bootable_system(image_tag, output_path, filesystem)?;
 
         // Inject trellis configuration into the INSTALLED disk image
-        self.inject_configuration_to_disk(output_path)?;
+        self.inject_configuration_to_disk(output_path, root_password)?;
 
         self.msg("Bootable image generated successfully");
         Ok(())
@@ -192,11 +193,12 @@ impl<'a> ImageGenerator<'a> {
     /// # Arguments
     ///
     /// * `disk_image_path` - Path to the bootable disk image file
+    /// * `root_password` - Optional root password to set in the image
     ///
     /// # Errors
     ///
     /// Returns an error if mounting, writing, or unmounting fails.
-    pub fn inject_configuration_to_disk(&self, disk_image_path: &Path) -> Result<()> {
+    pub fn inject_configuration_to_disk(&self, disk_image_path: &Path, root_password: Option<&str>) -> Result<()> {
         self.msg("Injecting trellis configuration into disk image");
 
         // Generate the configuration TOML
@@ -241,10 +243,8 @@ impl<'a> ImageGenerator<'a> {
         let root_partition = format!("{}p3", loop_device);
 
         // Create a temporary mount point
-        let mount_point = std::env::temp_dir().join(format!(
-            "trellis-mount-{}",
-            std::process::id()
-        ));
+        let mount_point =
+            std::env::temp_dir().join(format!("trellis-mount-{}", std::process::id()));
         std::fs::create_dir_all(&mount_point).context("Failed to create mount point")?;
 
         // Function to ensure cleanup happens
@@ -276,7 +276,11 @@ impl<'a> ImageGenerator<'a> {
             ));
         }
 
-        self.msg(&format!("Mounted {} at {}", root_partition, mount_point.display()));
+        self.msg(&format!(
+            "Mounted {} at {}",
+            root_partition,
+            mount_point.display()
+        ));
 
         // Create trellis directories
         let trellis_config_dir = mount_point.join("etc/trellis");
@@ -324,14 +328,22 @@ impl<'a> ImageGenerator<'a> {
             }
         }
 
+        // Set root password if provided
+        if let Some(password) = root_password {
+            self.msg("Setting root password in disk image");
+            if let Err(e) = self.set_root_password_in_shadow(&mount_point, password) {
+                cleanup(self.executor.as_ref(), &mount_point, &loop_device);
+                return Err(e);
+            }
+        }
+
         // Sync to ensure all writes are flushed
         let _ = self.executor.execute("sync", &[]);
 
         // Clean up: unmount and detach loopback
-        let output = self.executor.execute(
-            "umount",
-            &[mount_point.to_string_lossy().to_string()],
-        )?;
+        let output = self
+            .executor
+            .execute("umount", &[mount_point.to_string_lossy().to_string()])?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -340,10 +352,9 @@ impl<'a> ImageGenerator<'a> {
 
         let _ = std::fs::remove_dir(&mount_point);
 
-        let output = self.executor.execute(
-            "losetup",
-            &["-d".to_string(), loop_device.clone()],
-        )?;
+        let output = self
+            .executor
+            .execute("losetup", &["-d".to_string(), loop_device.clone()])?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -444,6 +455,116 @@ impl<'a> ImageGenerator<'a> {
         }
         Ok(())
     }
+
+    /// Generate a SHA-512 crypt hash for a password.
+    ///
+    /// Uses a random salt and returns a hash suitable for /etc/shadow.
+    fn hash_password(password: &str) -> Result<String> {
+        use sha_crypt::{sha512_simple, Sha512Params};
+
+        // Generate hash with default parameters (rounds, salt, etc.)
+        let params = Sha512Params::new(10_000)
+            .map_err(|e| anyhow!("Failed to create hash params: {:?}", e))?;
+        let hash = sha512_simple(password, &params)
+            .map_err(|e| anyhow!("Failed to hash password: {:?}", e))?;
+
+        Ok(hash)
+    }
+
+    /// Set the root password in the mounted filesystem's /etc/shadow file.
+    ///
+    /// # Arguments
+    ///
+    /// * `mount_point` - Path to the mounted root filesystem
+    /// * `password` - Plaintext password to hash and set
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - /etc/shadow cannot be read
+    /// - Password hashing fails
+    /// - File writing fails
+    /// - Shadow file format is invalid
+    fn set_root_password_in_shadow(
+        &self,
+        mount_point: &Path,
+        password: &str,
+    ) -> Result<()> {
+        let shadow_path = mount_point.join("etc/shadow");
+
+        // Verify shadow file exists
+        if !shadow_path.exists() {
+            return Err(anyhow!("Shadow file not found at {}", shadow_path.display()));
+        }
+
+        // Read existing shadow file
+        let shadow_content = std::fs::read_to_string(&shadow_path)
+            .context("Failed to read /etc/shadow")?;
+
+        // Hash the password
+        let password_hash = Self::hash_password(password)
+            .context("Failed to hash password")?;
+
+        // Parse and modify shadow entries
+        let mut modified = false;
+        let new_content: String = shadow_content
+            .lines()
+            .map(|line| {
+                if line.starts_with("root:") {
+                    modified = true;
+                    // Shadow format: username:password:lastchanged:min:max:warn:inactive:expire:reserved
+                    let parts: Vec<&str> = line.split(':').collect();
+                    if parts.len() >= 2 {
+                        // Replace password field (index 1), keep everything else
+                        let mut new_parts = parts.clone();
+                        new_parts[1] = &password_hash;
+                        new_parts.join(":")
+                    } else {
+                        // Malformed line, skip modification
+                        line.to_string()
+                    }
+                } else {
+                    line.to_string()
+                }
+            })
+            .collect::<Vec<String>>()
+            .join("\n");
+
+        if !modified {
+            return Err(anyhow!("Root entry not found in /etc/shadow"));
+        }
+
+        // --- Start of safe atomic write pattern ---
+
+        // 1. Create a temporary file in the same directory
+        let temp_file_path = shadow_path.with_extension("tmp");
+        let mut temp_file = std::fs::File::create(&temp_file_path)
+            .context("Failed to create temporary shadow file")?;
+
+        // 2. Write the new content to the temporary file
+        // Add a trailing newline, as .join("\n") does not.
+        use std::io::Write;
+        write!(temp_file, "{}\n", new_content)
+            .context("Failed to write to temporary shadow file")?;
+
+        // 3. Sync data to disk to ensure it's not just in a buffer
+        temp_file.sync_all().context("Failed to sync temporary shadow file")?;
+
+        // 4. Copy permissions from the original file to the new one
+        let metadata = std::fs::metadata(&shadow_path)
+            .context("Failed to get shadow file metadata")?;
+        std::fs::set_permissions(&temp_file_path, metadata.permissions())
+            .context("Failed to set permissions on temporary shadow file")?;
+
+        // 5. Atomically rename the temporary file to replace the original
+        std::fs::rename(&temp_file_path, &shadow_path)
+            .context("Failed to atomically replace /etc/shadow")?;
+
+        // --- End of safe atomic write pattern ---
+
+        self.msg("Root password set successfully");
+        Ok(())
+    }
 }
 
 impl<'a> TrellisMessaging for ImageGenerator<'a> {}
@@ -452,6 +573,7 @@ impl<'a> TrellisMessaging for ImageGenerator<'a> {}
 mod tests {
     use super::*;
     use std::path::PathBuf;
+    use std::os::unix::fs::PermissionsExt;
 
     /// Create a minimal TrellisConfig for testing.
     fn create_test_config() -> TrellisConfig {
@@ -520,5 +642,205 @@ mod tests {
         let config = create_test_config();
         let result = resolve_image_tag(&config, Some("quay.io/org/my-image"));
         assert_eq!(result, "quay.io/org/my-image:latest");
+    }
+
+    #[test]
+    fn hash_password_generates_sha512_crypt() -> Result<()> {
+        let hash = ImageGenerator::hash_password("test_password")?;
+        // SHA-512 crypt format starts with $6$
+        assert!(
+            hash.starts_with("$6$"),
+            "Hash should start with $6$ for SHA-512 crypt format, got: {}",
+            hash
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn hash_password_different_salts_produce_different_hashes() -> Result<()> {
+        let password = "same_password";
+        let hash1 = ImageGenerator::hash_password(password)?;
+        let hash2 = ImageGenerator::hash_password(password)?;
+        // Different salts should produce different hashes
+        assert_ne!(hash1, hash2, "Same password should produce different hashes due to different salts");
+        Ok(())
+    }
+
+    #[test]
+    fn hash_password_various_passwords() -> Result<()> {
+        let passwords = vec![
+            "simple",
+            "with spaces",
+            "special!@#$%chars",
+            "unicode_рос𝓈ia",
+            "verylongpasswordwithmanycharactersandsomething",
+        ];
+        
+        for password in passwords {
+            let hash = ImageGenerator::hash_password(password)?;
+            assert!(
+                hash.starts_with("$6$"),
+                "Hash for password '{}' should start with $6$, got: {}",
+                password,
+                hash
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn set_root_password_in_shadow_modifies_password_field() -> Result<()> {
+        use std::io::Write;
+
+        // Create a temporary shadow file
+        let shadow_dir = tempfile::TempDir::new()?;
+        let shadow_path = shadow_dir.path().join("shadow");
+        let mut shadow_file = std::fs::File::create(&shadow_path)?;
+        let original_content = "root:$6$oldhashedpassword:19234:0:99999:7:::\nuser:$6$otherpass:19234:0:99999:7:::\n";
+        shadow_file.write_all(original_content.as_bytes())?;
+        shadow_file.flush()?;
+        
+        // Create a temporary mount point
+        let mount_dir = tempfile::TempDir::new()?;
+        let etc_dir = mount_dir.path().join("etc");
+        std::fs::create_dir(&etc_dir)?;
+        std::fs::copy(&shadow_path, etc_dir.join("shadow"))?;
+
+        // Set permissions on shadow file (typically 0600)
+        std::fs::set_permissions(etc_dir.join("shadow"), std::fs::Permissions::from_mode(0o600))?;
+
+        // Create a test ImageGenerator
+        let config = create_test_config();
+        // The method doesn't actually need the executor for the shadow file modification
+        let executor = Arc::new(super::super::executor::RealCommandExecutor::new());
+        let generator = ImageGenerator::new(&config, executor);
+
+        // Call the method
+        generator.set_root_password_in_shadow(mount_dir.path(), "newpassword")?;
+
+        // Read the shadow file
+        let modified_content = std::fs::read_to_string(etc_dir.join("shadow"))?;
+        let root_line = modified_content
+            .lines()
+            .find(|line| line.starts_with("root:"))
+            .expect("Root entry should exist");
+
+        // Verify the password field changed
+        let parts: Vec<&str> = root_line.split(':').collect();
+        assert!(parts.len() >= 2, "Shadow entry should have at least 2 fields");
+        assert!(
+            parts[1].starts_with("$6$"),
+            "Password field should be a SHA-512 hash"
+        );
+
+        // Verify the old hash is not present
+        assert!(!parts[1].contains("oldhashedpassword"), "Old password should be replaced");
+
+        // Verify user entry is unchanged
+        let user_line = modified_content
+            .lines()
+            .find(|line| line.starts_with("user:"))
+            .expect("User entry should exist");
+        assert!(user_line.contains("$6$otherpass"), "Other user entry should be unchanged");
+
+        Ok(())
+    }
+
+    #[test]
+    fn set_root_password_in_shadow_missing_shadow_file_returns_error() -> Result<()> {
+        // Create a temporary mount point without shadow file
+        let mount_dir = tempfile::TempDir::new()?;
+        let etc_dir = mount_dir.path().join("etc");
+        std::fs::create_dir(&etc_dir)?;
+
+        // Create test objects
+        let config = create_test_config();
+        let executor = Arc::new(super::super::executor::RealCommandExecutor::new());
+        let generator = ImageGenerator::new(&config, executor);
+
+        // Call the method - should fail
+        let result = generator.set_root_password_in_shadow(mount_dir.path(), "newpassword");
+
+        assert!(result.is_err(), "Should return error when shadow file missing");
+        assert!(
+            result.unwrap_err().to_string().contains("Shadow file not found"),
+            "Error should mention shadow file not found"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn set_root_password_in_shadow_no_root_entry_returns_error() -> Result<()> {
+        use std::io::Write;
+
+        // Create a shadow file without root entry
+        let shadow_dir = tempfile::TempDir::new()?;
+        let shadow_path = shadow_dir.path().join("shadow");
+        let mut shadow_file = std::fs::File::create(&shadow_path)?;
+        let content = "user:$6$otherpass:19234:0:99999:7:::\n";
+        shadow_file.write_all(content.as_bytes())?;
+        shadow_file.flush()?;
+
+        // Create a temporary mount point
+        let mount_dir = tempfile::TempDir::new()?;
+        let etc_dir = mount_dir.path().join("etc");
+        std::fs::create_dir(&etc_dir)?;
+        std::fs::copy(&shadow_path, etc_dir.join("shadow"))?;
+
+        // Create test objects
+        let config = create_test_config();
+        let executor = Arc::new(super::super::executor::RealCommandExecutor::new());
+        let generator = ImageGenerator::new(&config, executor);
+
+        // Call the method - should fail
+        let result = generator.set_root_password_in_shadow(mount_dir.path(), "newpassword");
+
+        assert!(result.is_err(), "Should return error when root entry missing");
+        assert!(
+            result.unwrap_err().to_string().contains("Root entry not found"),
+            "Error should mention root entry not found"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn set_root_password_in_shadow_preserves_permissions() -> Result<()> {
+        use std::io::Write;
+        use std::fs::Permissions;
+
+        // Create a temporary shadow file
+        let shadow_dir = tempfile::TempDir::new()?;
+        let shadow_path = shadow_dir.path().join("shadow");
+        let mut shadow_file = std::fs::File::create(&shadow_path)?;
+        let original_content = "root:$6$oldhashedpassword:19234:0:99999:7:::\n";
+        shadow_file.write_all(original_content.as_bytes())?;
+        shadow_file.flush()?;
+        
+        // Create a temporary mount point
+        let mount_dir = tempfile::TempDir::new()?;
+        let etc_dir = mount_dir.path().join("etc");
+        std::fs::create_dir(&etc_dir)?;
+        let target_shadow_path = etc_dir.join("shadow");
+        std::fs::copy(&shadow_path, &target_shadow_path)?;
+
+        // Set specific permissions (0600 is typical for shadow)
+        let perms = Permissions::from_mode(0o600);
+        std::fs::set_permissions(&target_shadow_path, perms)?;
+
+        // Create test objects
+        let config = create_test_config();
+        let executor = Arc::new(super::super::executor::RealCommandExecutor::new());
+        let generator = ImageGenerator::new(&config, executor);
+
+        // Call the method
+        generator.set_root_password_in_shadow(mount_dir.path(), "newpassword")?;
+
+        // Check that permissions are preserved
+        let new_perms = std::fs::metadata(&target_shadow_path)?.permissions().mode();
+        assert_eq!(new_perms & 0o777, 0o600, "Permissions should be preserved as 0600");
+
+        Ok(())
     }
 }

@@ -16,6 +16,7 @@ walkdir = "2.5"
 which = "8.0"
 lru = "0.16"
 uuid = { version = "1.6", features = ["v4"] }
+sha-crypt = "0.5" # For SHA-512 password hashing
 
 [dev-dependencies]
 tempfile = "3.8"

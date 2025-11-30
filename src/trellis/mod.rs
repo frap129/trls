@@ -139,12 +139,14 @@ impl TrellisApp {
                 output,
                 filesystem,
                 size,
+                root_password,
             } => trellis.generate_bootable_image(
                 *build,
                 image.as_deref(),
                 output.clone(),
                 filesystem,
                 *size,
+                root_password.as_deref(),
             ),
         }
     }
@@ -259,6 +261,7 @@ impl<'a> Trellis<'a> {
     /// * `output_path` - Optional output path (uses bootable.img if None)
     /// * `filesystem` - Filesystem type for the image
     /// * `size_gb` - Size of the image in gigabytes
+    /// * `root_password` - Optional root password to set in the generated image
     pub fn generate_bootable_image(
         &self,
         build_first: bool,
@@ -266,7 +269,14 @@ impl<'a> Trellis<'a> {
         output_path: Option<PathBuf>,
         filesystem: &str,
         size_gb: u64,
+        root_password: Option<&str>,
     ) -> Result<()> {
+        // Display security warning if root password is provided
+        if root_password.is_some() {
+            self.warning("Security notice: Password provided via command-line is visible in process list and shell history");
+            self.warning("Consider using environment variables or password files for production use");
+        }
+
         // Optionally build first
         if build_first {
             self.build_rootfs_container()?;
@@ -276,7 +286,13 @@ impl<'a> Trellis<'a> {
         let output = output_path.unwrap_or_else(|| PathBuf::from("bootable.img"));
 
         let generator = ImageGenerator::new(self.config, Arc::clone(&self.executor));
-        generator.generate_bootable_image(&resolved_image_tag, &output, filesystem, size_gb)
+        generator.generate_bootable_image(
+            &resolved_image_tag,
+            &output,
+            filesystem,
+            size_gb,
+            root_password,
+        )
     }
     ///
     /// # Returns
